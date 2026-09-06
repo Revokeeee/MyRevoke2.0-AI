@@ -57,6 +57,12 @@ jobs:
         uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Two ways to authenticate - set whichever secret you prefer and
+          # leave the other unset. CLAUDE_CODE_OAUTH_TOKEN draws against a
+          # Claude Pro/Max subscription (generate with `claude setup-token`);
+          # ANTHROPIC_API_KEY bills separately as pay-as-you-go API usage.
+          # The action needs exactly one of them to be non-empty.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
             You are working in the MyRevoke 2.0 (AI-driven) C++ game engine repo.
