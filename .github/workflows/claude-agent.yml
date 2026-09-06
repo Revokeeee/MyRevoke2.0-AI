@@ -71,6 +71,10 @@ jobs:
           # this workflow at all to the repo owner - this is not exposed to
           # arbitrary public input the way, say, a fork PR's code would be.
           claude_args: "--permission-mode bypassPermissions"
+          # TEMPORARY DEBUG FLAG (2nd round) - run #34057414403 did 17 real
+          # turns, $0.88, zero errors, but produced no branch/PR/comment.
+          # Need to see what it actually did. Revert once diagnosed.
+          show_full_output: true
           prompt: |
             You are working in the MyRevoke 2.0 (AI-driven) C++ game engine repo.
 
