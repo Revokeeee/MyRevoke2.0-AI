@@ -13,8 +13,23 @@ permissions:
   contents: read
   pull-requests: write
 
+# Cancel an in-progress review for this PR when new commits arrive, so
+# rapid pushes don't queue up multiple paid reviews or post stale feedback
+# after a newer run has already started.
+concurrency:
+  group: claude-pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   claude-review:
+    # Secrets are withheld from pull_request runs triggered by forks and by
+    # Dependabot, so ANTHROPIC_API_KEY would be empty and this job would
+    # fail rather than just skip. Guard explicitly instead of showing a red
+    # X on every external/Dependabot PR. This repo doesn't expect outside
+    # contributions right now; revisit if that changes.
+    if: >
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo (with submodules)
@@ -30,6 +45,7 @@ jobs:
         uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
             Review this PR for the MyRevoke C++ game engine.
 
@@ -42,5 +58,3 @@ jobs:
 
             Be specific: line numbers, what the bug is, why it matters, how to fix it.
             Approve if no issues, or request changes with concrete suggestions.
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
