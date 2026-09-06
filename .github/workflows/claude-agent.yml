@@ -64,14 +64,30 @@ jobs:
           # The action needs exactly one of them to be non-empty.
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          # TEMPORARY DEBUG FLAG - remove after diagnosing issue #2's silent
-          # 1-turn, 0-tool-call run. Exposes full Claude output (including
-          # tool results) in the public Actions log. Revert once diagnosed.
-          show_full_output: true
+          # Headless CI has no human available to click "allow" on tool-use
+          # prompts, so without this, Edit/Write/Bash all silently stall
+          # waiting for an approval that never comes. Safe here specifically
+          # because the job's `if:` above already restricts who can trigger
+          # this workflow at all to the repo owner - this is not exposed to
+          # arbitrary public input the way, say, a fork PR's code would be.
+          claude_args: "--permission-mode bypassPermissions"
           prompt: |
             You are working in the MyRevoke 2.0 (AI-driven) C++ game engine repo.
 
-            Your context document is in the issue/comment. Use it to:
+            ## Triggering issue/PR
+            Title: ${{ github.event.issue.title }}
+            URL: ${{ github.event.issue.html_url }}
+            Body:
+            ${{ github.event.issue.body }}
+
+            ## Triggering comment
+            (Present only if this run was started by an @claude comment rather
+            than the ai-task label - otherwise ignore this section.)
+            ${{ github.event.comment.body }}
+
+            ## Your task
+            Use the title/body/comment above as the actual task description -
+            it is not a placeholder, it is the real request. Then:
             1. Understand what's being asked
             2. Break the task into concrete steps if needed
             3. Write code that matches the existing architecture (ECS, Premake, modular design)
