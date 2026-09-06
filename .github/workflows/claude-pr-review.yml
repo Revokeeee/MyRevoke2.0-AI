@@ -1,0 +1,43 @@
+name: Claude PR Review
+
+# Automatically review every PR with Claude
+#
+# Triggered on: pull_request (opened, synchronize, reopened)
+# Requires: ANTHROPIC_API_KEY repository secret
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo (with submodules)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Claude Code Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: |
+            Review this PR for the MyRevoke C++ game engine.
+
+            Focus on:
+            - Correctness: Does the code do what it intends? Any crashes, null-pointer bugs, UB?
+            - Architecture: Does it fit the existing engine design (ECS, modular, Premake build)?
+            - Memory: Leaks, use-after-free, dangling pointers?
+            - Performance: Allocations in tight loops? O(n²) where it shouldn't be?
+            - Style: Matches the codebase patterns (naming, error handling, smart pointers)?
+
+            Be specific: line numbers, what the bug is, why it matters, how to fix it.
+            Approve if no issues, or request changes with concrete suggestions.
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
