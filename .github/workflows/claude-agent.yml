@@ -36,13 +36,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repo (with submodules)
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
           submodules: recursive
 
       - name: Claude Code Action
-        uses: anthropics/claude-code-action@v1
+        # Pinned to the commit v1 pointed to on 2026-09-06, not the mutable
+        # @v1 tag - an upstream change to that tag can't silently alter
+        # what runs here with our write access + API key. Bump deliberately.
+        uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           prompt: |
