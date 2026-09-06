@@ -1,0 +1,66 @@
+name: Claude PR Review
+
+# Automatically review every PR with Claude
+#
+# Triggered on: pull_request (opened, synchronize, reopened)
+# Requires: ANTHROPIC_API_KEY repository secret
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# Cancel an in-progress review for this PR when new commits arrive, so
+# rapid pushes don't queue up multiple paid reviews or post stale feedback
+# after a newer run has already started.
+concurrency:
+  group: claude-pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  claude-review:
+    # Secrets are withheld from pull_request runs triggered by forks and by
+    # Dependabot, so ANTHROPIC_API_KEY would be empty and this job would
+    # fail rather than just skip. Guard explicitly instead of showing a red
+    # X on every external/Dependabot PR. This repo doesn't expect outside
+    # contributions right now; revisit if that changes.
+    if: >
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo (with submodules)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Claude Code Review
+        # Pinned to the commit v1 pointed to on 2026-09-06, not the mutable
+        # @v1 tag - an upstream change to that tag can't silently alter
+        # what runs here with our API key. Bump deliberately.
+        uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Two ways to authenticate - set whichever secret you prefer and
+          # leave the other unset. CLAUDE_CODE_OAUTH_TOKEN draws against a
+          # Claude Pro/Max subscription (generate with `claude setup-token`);
+          # ANTHROPIC_API_KEY bills separately as pay-as-you-go API usage.
+          # The action needs exactly one of them to be non-empty.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Review this PR for the MyRevoke C++ game engine.
+
+            Focus on:
+            - Correctness: Does the code do what it intends? Any crashes, null-pointer bugs, UB?
+            - Architecture: Does it fit the existing engine design (ECS, modular, Premake build)?
+            - Memory: Leaks, use-after-free, dangling pointers?
+            - Performance: Allocations in tight loops? O(n²) where it shouldn't be?
+            - Style: Matches the codebase patterns (naming, error handling, smart pointers)?
+
+            Be specific: line numbers, what the bug is, why it matters, how to fix it.
+            Approve if no issues, or request changes with concrete suggestions.

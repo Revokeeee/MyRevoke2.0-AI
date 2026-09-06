@@ -1,0 +1,82 @@
+name: Claude Agent (implement + open PR)
+
+# Lets you hand Claude a task from an issue or a comment and have it write
+# the code and open a PR itself.
+#
+# Trigger it by:
+#   - Adding the label "ai-task" to an issue, or
+#   - Commenting "@claude <instruction>" on an issue or PR
+#
+# Requires repo secret: ANTHROPIC_API_KEY
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  claude-agent:
+    # Security: this repo is public. Restrict this workflow to the repo
+    # owner only - github.event.sender is whoever performed the triggering
+    # action (added the label / wrote the comment), so this blocks anyone
+    # else from invoking Claude with write access + your ANTHROPIC_API_KEY,
+    # regardless of trigger type.
+    if: >
+      github.event.sender.login == 'Revokeeee' &&
+      (
+        (github.event_name == 'issues' && github.event.label.name == 'ai-task') ||
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo (with submodules)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Claude Code Action
+        # Pinned to the commit v1 pointed to on 2026-09-06, not the mutable
+        # @v1 tag - an upstream change to that tag can't silently alter
+        # what runs here with our write access + API key. Bump deliberately.
+        #
+        # Note: because this step opens PRs using secrets.GITHUB_TOKEN,
+        # GitHub's recursion-prevention rule means those PRs will NOT
+        # automatically trigger claude-pr-review.yml (or any other
+        # workflow) the way a human-opened PR would. Automatic Copilot
+        # review (configured as a repo ruleset) still fires on them since
+        # it isn't gated by GITHUB_TOKEN-triggered events the same way -
+        # but Claude's own PR-review workflow needs a manual nudge (e.g.
+        # push an empty commit, or re-run the workflow) if you want it too.
+        uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Two ways to authenticate - set whichever secret you prefer and
+          # leave the other unset. CLAUDE_CODE_OAUTH_TOKEN draws against a
+          # Claude Pro/Max subscription (generate with `claude setup-token`);
+          # ANTHROPIC_API_KEY bills separately as pay-as-you-go API usage.
+          # The action needs exactly one of them to be non-empty.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are working in the MyRevoke 2.0 (AI-driven) C++ game engine repo.
+
+            Your context document is in the issue/comment. Use it to:
+            1. Understand what's being asked
+            2. Break the task into concrete steps if needed
+            3. Write code that matches the existing architecture (ECS, Premake, modular design)
+            4. Test your assumptions (read the code first, don't guess)
+            5. When done, open a PR with:
+               - Clear title: what changed?
+               - Description: why, what changed, any caveats
+               - Link to the originating issue
+
+            Follow the existing code style (C++20, smart pointers, snake_case for functions/vars,
+            PascalCase for classes). Watch for memory/performance issues.
+            If you find bugs in existing code, fix them and note it.
