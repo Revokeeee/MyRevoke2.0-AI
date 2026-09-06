@@ -1,0 +1,128 @@
+name: Claude Agent PR Review + Auto-fix
+
+# claude-agent.yml opens PRs using the default GITHUB_TOKEN, and GitHub's
+# recursion-prevention rule means events created by GITHUB_TOKEN never
+# trigger other workflows - so claude-pr-review.yml's normal `pull_request`
+# trigger silently never fires on the agent's own PRs. workflow_run is the
+# one trigger type GitHub explicitly exempts from that rule (its purpose is
+# exactly "run something after another workflow finishes"), so we use it
+# here to review the agent's PR, then immediately fix whatever the review
+# found and push those fixes to the same branch - no human checkpoint
+# between review and code changes reaching the PR by design.
+#
+# Requires the same auth secret(s) as the other Claude workflows:
+# CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY.
+
+on:
+  workflow_run:
+    workflows: ["Claude Agent (implement + open PR)"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: claude-agent-review-and-fix-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+jobs:
+  review-and-fix:
+    # Security: the upstream claude-agent.yml job only runs its steps when
+    # github.event.sender.login == 'Revokeeee' - if that check fails, the
+    # upstream run's conclusion is 'skipped', not 'success', so this job
+    # naturally never fires for anyone else's issues/comments. The actor
+    # check below is defense-in-depth on top of that inherited gate.
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.actor.login == 'Revokeeee'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find the PR the agent just opened
+        id: find-pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          PR_NUMBER=$(gh pr list --repo "${{ github.repository }}" --head "$HEAD_BRANCH" --state open --json number --jq '.[0].number')
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No open PR found for branch $HEAD_BRANCH - the agent run may not have opened one. Nothing to review."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout PR branch (with submodules)
+        if: steps.find-pr.outputs.found == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Claude Code Review
+        if: steps.find-pr.outputs.found == 'true'
+        id: review
+        uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Same reasoning as claude-agent.yml: headless CI has no human to
+          # approve tool-use prompts. Safe here because this whole job only
+          # runs after the owner-gated agent workflow already succeeded.
+          claude_args: "--permission-mode bypassPermissions"
+          prompt: |
+            You are reviewing PR #${{ steps.find-pr.outputs.pr_number }} in the
+            MyRevoke 2.0 (AI-driven) C++ game engine repo. This PR was just
+            opened automatically by another Claude agent run implementing a
+            task from an issue - you are the review step in that pipeline.
+
+            Use `gh pr diff ${{ steps.find-pr.outputs.pr_number }}` to see the
+            actual changes, and `gh pr view ${{ steps.find-pr.outputs.pr_number }}`
+            for the PR description and originating issue link if you need more
+            context.
+
+            Focus on:
+            - Correctness: does the code do what it intends? Crashes, null-pointer
+              bugs, undefined behavior?
+            - Architecture: does it fit the existing engine design (ECS, modular,
+              Premake build)?
+            - Memory: leaks, use-after-free, dangling pointers, ownership mistakes?
+            - Performance: allocations in tight loops, accidental O(n^2)?
+            - Style: matches the codebase patterns (naming, error handling, smart
+              pointers)?
+
+            Post your findings with:
+            `gh pr review ${{ steps.find-pr.outputs.pr_number }} --comment --body "..."`
+            (use `--request-changes` instead of `--comment` if you find real
+            issues, or `--approve` if the PR genuinely looks correct as-is).
+            Be specific: file, line, what's wrong, why it matters. If you find
+            nothing worth flagging, say so briefly rather than inventing filler
+            feedback.
+
+      - name: Claude Code Auto-fix
+        if: steps.find-pr.outputs.found == 'true'
+        uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # --resume continues the exact review session above (same context,
+          # same findings) rather than having this step rediscover them from
+          # scratch by re-reading PR comments.
+          claude_args: "--permission-mode bypassPermissions --resume ${{ steps.review.outputs.session_id }}"
+          prompt: |
+            Now address the findings from the review you just posted on PR
+            #${{ steps.find-pr.outputs.pr_number }}.
+
+            For each finding:
+            - If it's a real, fixable issue, fix it.
+            - If you're not confident it's a genuine issue, or it's out of
+              scope for this PR, leave it - do not guess.
+
+            Commit your fixes and push directly to this branch (already
+            checked out locally) - do NOT open a new PR, do NOT force-push.
+            If you made no changes because there was nothing to fix, do not
+            push an empty commit.
