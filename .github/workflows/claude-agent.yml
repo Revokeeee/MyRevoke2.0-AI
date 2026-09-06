@@ -22,17 +22,16 @@ permissions:
 
 jobs:
   claude-agent:
-    # Security: this repo is public, so anyone can comment on an issue/PR.
-    # The 'ai-task' label is naturally gated (GitHub requires triage/write
-    # access to add labels), but the '@claude' comment trigger is NOT gated
-    # by GitHub itself - without this check, any stranger's comment would
-    # run this workflow with write access + your ANTHROPIC_API_KEY.
+    # Security: this repo is public. Restrict this workflow to the repo
+    # owner only - github.event.sender is whoever performed the triggering
+    # action (added the label / wrote the comment), so this blocks anyone
+    # else from invoking Claude with write access + your ANTHROPIC_API_KEY,
+    # regardless of trigger type.
     if: >
-      (github.event_name == 'issues' && github.event.label.name == 'ai-task') ||
+      github.event.sender.login == 'Revokeeee' &&
       (
-        github.event_name == 'issue_comment' &&
-        contains(github.event.comment.body, '@claude') &&
-        contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
+        (github.event_name == 'issues' && github.event.label.name == 'ai-task') ||
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
       )
     runs-on: ubuntu-latest
     steps:
