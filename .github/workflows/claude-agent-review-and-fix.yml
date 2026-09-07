@@ -104,23 +104,35 @@ jobs:
             section is addressed to the human, not you, but read it too so
             you don't re-raise something already flagged there.
 
-            Otherwise focus on:
-            - Correctness: does the code do what it intends? Crashes, null-pointer
-              bugs, undefined behavior?
-            - Architecture: does it fit the existing engine design (ECS, modular,
-              Premake build)?
-            - Memory: leaks, use-after-free, dangling pointers, ownership mistakes?
-            - Performance: allocations in tight loops, accidental O(n^2)?
-            - Style: matches the codebase patterns (naming, error handling, smart
-              pointers)?
+            Otherwise, only flag problems that will actually break something:
+            - Correctness: logic that doesn't do what the surrounding code
+              clearly intends - wrong results, inverted conditions, off-by-one.
+            - Crashes and undefined behavior: null-pointer dereferences,
+              out-of-bounds access, invalid casts, uninitialized reads.
+            - Memory safety: leaks, use-after-free, double-free, dangling
+              pointers/references, ownership mistakes that will actually
+              corrupt state or crash - not just "could be a shared_ptr instead".
+            - Concurrency: real data races, if threading is involved.
+
+            Do NOT flag:
+            - Style, formatting, or naming preferences that don't change behavior.
+            - Architecture opinions, or "this could be organized differently",
+              unless it's an active bug.
+            - Speculative concerns ("this might not scale", "consider making
+              this configurable") without a concrete failure case today.
+            - Missing tests or missing documentation - known, accepted gaps here.
+            - Anything you're not confident is a real, reproducible problem.
+
+            A finding needs a concrete failure scenario - what input or state
+            triggers it, what actually breaks - or it isn't worth posting.
+            Fewer, high-confidence findings beat exhaustive nitpicking; approving
+            with nothing to say is a normal, expected outcome, not a miss.
 
             Post your findings with:
             `gh pr review ${{ steps.find-pr.outputs.pr_number }} --comment --body "..."`
             (use `--request-changes` instead of `--comment` if you find real
             issues, or `--approve` if the PR genuinely looks correct as-is).
-            Be specific: file, line, what's wrong, why it matters. If you find
-            nothing worth flagging, say so briefly rather than inventing filler
-            feedback.
+            Be specific: file, line, what's wrong, why it matters.
 
       - name: Claude Code Auto-fix + escalate if needed
         if: steps.find-pr.outputs.found == 'true'
@@ -147,6 +159,19 @@ jobs:
             If you make changes, commit and push directly to this branch
             (already checked out locally) - do NOT open a new PR, do NOT
             force-push. If you made no changes, do not push an empty commit.
+
+            ## Report what you fixed
+
+            If you made any changes, post one comment on the PR with
+            `gh pr comment ${{ steps.find-pr.outputs.pr_number }} --body "..."`
+            titled `Fixes applied:`, listing each fix as one line:
+            `- <file>:<line> - <what was wrong> -> <what you changed>`.
+            If you looked at a finding and deliberately left it alone, list
+            that too, under a `Left as-is:` heading, with why. This is the
+            human's record of what changed and why - specific enough that
+            they can judge each fix on its own and `git revert` the commit if
+            they disagree with how something was handled, without re-deriving
+            it from the diff. Skip this entirely if you made no changes at all.
 
             ## Never merge
 
