@@ -1,0 +1,28 @@
+# clang-format config for the MyRevoke engine, RevokeCraft editor, and
+# SandBox source. Does NOT apply to vendor/ - those libraries ship their
+# own style configs.
+#
+# Based on LLVM, adjusted to match the conventions already used in the
+# existing source (Allman braces, tab indentation, left-aligned
+# pointers/references). Naming conventions (snake_case functions/vars,
+# PascalCase classes) aren't something clang-format can enforce.
+BasedOnStyle: LLVM
+Language: Cpp
+Standard: c++20
+
+UseTab: Always
+TabWidth: 4
+IndentWidth: 4
+ColumnLimit: 0
+
+BreakBeforeBraces: Allman
+NamespaceIndentation: All
+AccessModifierOffset: -4
+AllowShortFunctionsOnASingleLine: All
+AllowShortBlocksOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+
+PointerAlignment: Left
+ReferenceAlignment: Left
+
+SortIncludes: false
