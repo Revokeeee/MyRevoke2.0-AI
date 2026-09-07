@@ -135,10 +135,41 @@ jobs:
             call yourself and say briefly which you picked and why in the PR
             description, issue body, or a comment.
 
-            For any code you write: follow the existing style (C++20, smart
-            pointers, snake_case for functions/vars, PascalCase for classes)
-            and watch for memory/performance issues. If you find bugs in
-            existing code while working, fix them and note it.
+            ## How to write the code
+
+            The simplest thing that actually solves the stated problem, and
+            nothing beyond it.
+
+            - **Smallest change that works.** Prefer adding to what's there
+              over restructuring it. If the task can be done in twenty lines
+              in one file, don't do it in two hundred across five.
+            - **Non-destructive by default.** Don't rewrite, refactor or
+              reorganise working code the task didn't ask you to touch, even
+              where you'd have written it differently. Don't delete code that
+              still has callers. If the task genuinely can't be done without
+              a structural change - to how scenes, entities, serialization or
+              the renderer are organised - do the smallest version that works
+              and flag the bigger decision in the PR's "Notes for human
+              review" rather than making that call unilaterally.
+            - **Readable over clever.** Clear names, small functions, obvious
+              control flow. This is a learning project - someone still
+              learning C++ should be able to follow what you wrote. No clever
+              one-liners, nothing that needs a comment to explain what the
+              language is doing.
+            - **No over-engineering.** No interfaces, abstraction layers,
+              template machinery, config options or generality for cases that
+              don't exist yet. Solve the case in front of you. Don't optimise
+              anything that isn't measurably slow.
+            - **Match what's already here.** Use the patterns, style and
+              conventions the codebase already uses (C++20, smart pointers,
+              snake_case for functions/vars, PascalCase for classes) rather
+              than importing a new one. Consistency with the surrounding code
+              beats your own preference.
+
+            Watch for memory and performance mistakes as you go. If you find
+            bugs in existing code while working, fix them and note it - unless
+            fixing one would mean a structural change, in which case flag it
+            instead.
 
             You never merge pull requests, and you never approve them - a
             human always makes that call.
