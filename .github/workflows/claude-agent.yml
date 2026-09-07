@@ -1,13 +1,30 @@
 name: Claude Agent (implement + open PR)
 
-# Lets you hand Claude a task from an issue or a comment and have it write
-# the code and open a PR itself.
+# Lets you hand Claude a task from an issue or a comment. Depending on what
+# you ask for, it either writes the code and opens a PR, or creates new
+# GitHub issues - it never merges anything, that stays a human decision.
 #
 # Trigger it by:
 #   - Adding the label "ai-task" to an issue, or
-#   - Commenting "@claude <instruction>" on an issue or PR
+#   - Commenting "@claude <instruction>" on an issue or PR (GitHub fires
+#     issue_comment for PR comments too, so both work)
 #
-# Requires repo secret: ANTHROPIC_API_KEY
+# Examples:
+#   - Label an issue "ai-task"          -> implements it, opens a PR
+#   - "@claude fix the null deref in X" -> implements it, opens a PR
+#   - "@claude open an issue for the
+#      shader refactor we discussed"    -> creates that issue, no PR
+#
+# Optionally add one of these labels to the issue to pick which model
+# implements it - defaults to Sonnet if none is present. These apply to
+# both trigger types: a comment on an already-labelled issue/PR inherits
+# whatever model:* label is already there, since GitHub includes the
+# issue's current labels on every issue_comment event too.
+#   - model:haiku  - trivial/cheap tasks
+#   - model:sonnet - default, good balance for most tasks
+#   - model:opus   - complex or high-stakes tasks
+#
+# Requires one auth secret: CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY
 
 on:
   issues:
@@ -35,6 +52,19 @@ jobs:
       )
     runs-on: ubuntu-latest
     steps:
+      - name: Pick model from issue labels
+        id: pick-model
+        env:
+          LABELS: ${{ toJson(github.event.issue.labels.*.name) }}
+        run: |
+          if echo "$LABELS" | grep -q "model:opus"; then
+            echo "model=claude-opus-5" >> "$GITHUB_OUTPUT"
+          elif echo "$LABELS" | grep -q "model:haiku"; then
+            echo "model=claude-haiku-4-5" >> "$GITHUB_OUTPUT"
+          else
+            echo "model=claude-sonnet-5" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout repo (with submodules)
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -70,11 +100,7 @@ jobs:
           # because the job's `if:` above already restricts who can trigger
           # this workflow at all to the repo owner - this is not exposed to
           # arbitrary public input the way, say, a fork PR's code would be.
-          claude_args: "--permission-mode bypassPermissions"
-          # TEMPORARY DEBUG FLAG (2nd round) - run #34057414403 did 17 real
-          # turns, $0.88, zero errors, but produced no branch/PR/comment.
-          # Need to see what it actually did. Revert once diagnosed.
-          show_full_output: true
+          claude_args: "--permission-mode bypassPermissions --model ${{ steps.pick-model.outputs.model }}"
           prompt: |
             You are working in the MyRevoke 2.0 (AI-driven) C++ game engine repo.
 
@@ -86,21 +112,112 @@ jobs:
 
             ## Triggering comment
             (Present only if this run was started by an @claude comment rather
-            than the ai-task label - otherwise ignore this section.)
+            than the ai-task label - otherwise ignore this section. Note this
+            may be a comment on an issue OR on a pull request.)
             ${{ github.event.comment.body }}
 
             ## Your task
             Use the title/body/comment above as the actual task description -
-            it is not a placeholder, it is the real request. Then:
-            1. Understand what's being asked
-            2. Break the task into concrete steps if needed
-            3. Write code that matches the existing architecture (ECS, Premake, modular design)
-            4. Test your assumptions (read the code first, don't guess)
-            5. When done, open a PR with:
-               - Clear title: what changed?
-               - Description: why, what changed, any caveats
-               - Link to the originating issue
+            it is not a placeholder, it is the real request. Work out which
+            kind of task this actually is before doing anything:
 
-            Follow the existing code style (C++20, smart pointers, snake_case for functions/vars,
-            PascalCase for classes). Watch for memory/performance issues.
-            If you find bugs in existing code, fix them and note it.
+            **A code change** - implement it:
+            1. Break the task into concrete steps if needed
+            2. Write code that matches the existing architecture (ECS, Premake, modular design)
+            3. Test your assumptions (read the code first, don't guess)
+            4. When done, open a PR with a clear title saying what changed.
+               `gh pr create --body` bypasses the repo's PR template, so read
+               `.github/pull_request_template.md` yourself and write the body
+               following that structure - it is the source of truth, use
+               whatever sections it currently has rather than a remembered
+               version. Fill it in properly:
+               - Summary: what changed and why, linking the originating issue
+               - Checklist: tick honestly. There is no test suite yet, so for
+                 tests say how you actually verified the change instead.
+                 Tick "needs close human review" when the change involves a
+                 structural decision or anything you are unsure about.
+               - Notes for AI review: tell the automated reviewer what to
+                 focus on or skip for this specific change
+               - Notes for human review: anything needing a human judgment
+                 call - tradeoffs, scope questions, follow-up work that
+                 should become its own issue, partial fixes
+               Leave a section empty rather than padding it with filler.
+
+            **New issue(s) requested** - e.g. "create an issue for X", often
+            said in a comment on some other issue or PR. Create them directly
+            with `gh issue create`. Give each a clear, specific title and a
+            body with real context: what the work is, why it's needed, where
+            it came from (link the issue/PR that prompted it), and concrete
+            acceptance criteria where you can state them. Creating the
+            issue(s) is the whole task - do not also write code or open a PR
+            for it. Only create issues when actually asked to; never spawn
+            them on your own initiative during a code task.
+
+            If it's genuinely ambiguous which of the two is wanted, make the
+            call yourself and say briefly which you picked and why in the PR
+            description, issue body, or a comment.
+
+            ## Gathering context cheaply
+
+            Before reasoning about design or writing code, use the Task tool
+            with `model: haiku` to delegate broad, mechanical exploration -
+            "read through these N files and summarize", "find every caller
+            of X", "map out how the scene serialization format works" - to a
+            cheap subagent instead of doing that reading yourself. Reserve
+            your own turns for judgment calls, architecture decisions, and
+            actually writing the code. Skip this for anything already small
+            enough that delegating it would cost more than it saves.
+
+            ## How to write the code
+
+            The simplest thing that actually solves the stated problem, and
+            nothing beyond it.
+
+            - **Smallest change that works.** Prefer adding to what's there
+              over restructuring it. If the task can be done in twenty lines
+              in one file, don't do it in two hundred across five.
+            - **Non-destructive by default.** Don't rewrite, refactor or
+              reorganise working code the task didn't ask you to touch, even
+              where you'd have written it differently. Don't delete code that
+              still has callers. If the task genuinely can't be done without
+              a structural change - to how scenes, entities, serialization or
+              the renderer are organised - do the smallest version that works
+              and flag the bigger decision in the PR's "Notes for human
+              review" rather than making that call unilaterally.
+            - **Readable over clever.** Clear names, small functions, obvious
+              control flow. This is a learning project - someone still
+              learning C++ should be able to follow what you wrote. No clever
+              one-liners, nothing that needs a comment to explain what the
+              language is doing.
+            - **No over-engineering.** No interfaces, abstraction layers,
+              template machinery, config options or generality for cases that
+              don't exist yet. Solve the case in front of you. Don't optimise
+              anything that isn't measurably slow.
+            - **Match what's already here.** Use the patterns, style and
+              conventions the codebase already uses (C++20, smart pointers,
+              snake_case for functions/vars, PascalCase for classes) rather
+              than importing a new one. Consistency with the surrounding code
+              beats your own preference.
+            - **Comments explain why, never what.** Only write a comment when
+              the code alone can't carry the reasoning - a non-obvious
+              constraint, a workaround for a specific bug, an invariant the
+              reader could easily violate. If you're tempted to comment what
+              a line does, rename things or restructure until it doesn't need
+              one instead. Skip comments entirely when there's no genuine why
+              to explain - most changes don't need any.
+            - **Established structural patterns, not novel ones.** Reach for
+              well-known, widely-understood designs (composition, dependency
+              injection via constructor/parameters, observer/event-driven
+              where the codebase already is, RAII for resource ownership)
+              over inventing your own. Avoid singletons and other global
+              mutable state for anything new - pass dependencies explicitly
+              instead - even if similar existing code already uses one; don't
+              propagate that pattern further.
+
+            Watch for memory and performance mistakes as you go. If you find
+            bugs in existing code while working, fix them and note it - unless
+            fixing one would mean a structural change, in which case flag it
+            instead.
+
+            You never merge pull requests, and you never approve them - a
+            human always makes that call.
