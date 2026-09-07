@@ -7,8 +7,10 @@ name: Claude Agent PR Review + Auto-fix
 # one trigger type GitHub explicitly exempts from that rule (its purpose is
 # exactly "run something after another workflow finishes"), so we use it
 # here to review the agent's PR, then immediately fix whatever the review
-# found and push those fixes to the same branch - no human checkpoint
-# between review and code changes reaching the PR by design.
+# found and push those fixes to the same branch. If something genuinely
+# needs a human call (structural decision, scope for a separate issue,
+# ambiguous task, low-confidence fix) it posts one short "NEEDS DECISION:"
+# comment. It never merges - merging is always the human's decision.
 #
 # Requires the same auth secret(s) as the other Claude workflows:
 # CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY.
@@ -21,6 +23,9 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  # gh pr comment posts through the issues API (PR comments are issue
+  # comments under GitHub's model) - needed for the escalation comment.
+  issues: write
 
 concurrency:
   group: claude-agent-review-and-fix-${{ github.event.workflow_run.head_branch }}
@@ -84,7 +89,15 @@ jobs:
             for the PR description and originating issue link if you need more
             context.
 
-            Focus on:
+            The PR body follows this repo's template. Read its **Notes for AI
+            review** section first and honour it - it is the author telling
+            you what to focus on or leave alone for this specific change
+            ("ignore the submodule bump", "check ownership of X carefully",
+            "the duplication is deliberate"). Its **Notes for human review**
+            section is addressed to the human, not you, but read it too so
+            you don't re-raise something already flagged there.
+
+            Otherwise focus on:
             - Correctness: does the code do what it intends? Crashes, null-pointer
               bugs, undefined behavior?
             - Architecture: does it fit the existing engine design (ECS, modular,
@@ -102,7 +115,7 @@ jobs:
             nothing worth flagging, say so briefly rather than inventing filler
             feedback.
 
-      - name: Claude Code Auto-fix
+      - name: Claude Code Auto-fix + escalate if needed
         if: steps.find-pr.outputs.found == 'true'
         uses: anthropics/claude-code-action@9c5ddab2e6d17b83ea679153b31f1d5f023cf636
         with:
@@ -118,11 +131,42 @@ jobs:
             #${{ steps.find-pr.outputs.pr_number }}.
 
             For each finding:
-            - If it's a real, fixable issue, fix it.
-            - If you're not confident it's a genuine issue, or it's out of
-              scope for this PR, leave it - do not guess.
+            - If it's a real, fixable issue within the scope of this PR, fix it.
+            - If you're not confident it's a genuine issue, or fixing it is out
+              of scope for this PR, leave it - do not guess.
 
-            Commit your fixes and push directly to this branch (already
-            checked out locally) - do NOT open a new PR, do NOT force-push.
-            If you made no changes because there was nothing to fix, do not
-            push an empty commit.
+            If you make changes, commit and push directly to this branch
+            (already checked out locally) - do NOT open a new PR, do NOT
+            force-push. If you made no changes, do not push an empty commit.
+
+            ## Never merge
+
+            You do not merge pull requests, ever - not this one, not any
+            other. A human always makes the merge decision. Do not run
+            `gh pr merge`, do not enable auto-merge, do not approve the PR.
+            Your job ends at leaving the branch in a good state.
+
+            ## Escalate if a human needs to decide something
+
+            If any of the following apply, post exactly one short comment on
+            the PR flagging it for the human reviewer:
+            - The change implies a significant structural/architecture
+              decision someone should weigh in on before it lands.
+            - You noticed work that deserves its own issue (a new bug, a
+              missing feature, follow-up work uncovered while doing this
+              task) - flag it, do not create the issue yourself.
+            - The original task was ambiguous, or what's actually needed
+              turned out to be out of scope for this PR.
+            - You fixed something only partially, or you're not confident
+              the fix is correct.
+
+            To escalate, use
+            `gh pr comment ${{ steps.find-pr.outputs.pr_number }} --body "..."`
+            with a comment starting `NEEDS DECISION:` followed by 2-4 plain,
+            technical sentences: what the concern is, why it needs a human
+            call, and a concrete suggestion if you have one. No preamble, no
+            restating the whole PR - assume the reader will open the diff
+            themselves.
+
+            If none of those apply, post nothing here - the review you already
+            left is enough, and a redundant "looks good" comment is noise.
