@@ -165,6 +165,21 @@ jobs:
               snake_case for functions/vars, PascalCase for classes) rather
               than importing a new one. Consistency with the surrounding code
               beats your own preference.
+            - **Comments explain why, never what.** Only write a comment when
+              the code alone can't carry the reasoning - a non-obvious
+              constraint, a workaround for a specific bug, an invariant the
+              reader could easily violate. If you're tempted to comment what
+              a line does, rename things or restructure until it doesn't need
+              one instead. Skip comments entirely when there's no genuine why
+              to explain - most changes don't need any.
+            - **Established structural patterns, not novel ones.** Reach for
+              well-known, widely-understood designs (composition, dependency
+              injection via constructor/parameters, observer/event-driven
+              where the codebase already is, RAII for resource ownership)
+              over inventing your own. Avoid singletons and other global
+              mutable state for anything new - pass dependencies explicitly
+              instead - even if similar existing code already uses one; don't
+              propagate that pattern further.
 
             Watch for memory and performance mistakes as you go. If you find
             bugs in existing code while working, fix them and note it - unless
