@@ -77,7 +77,11 @@ jobs:
           # Same reasoning as claude-agent.yml: headless CI has no human to
           # approve tool-use prompts. Safe here because this whole job only
           # runs after the owner-gated agent workflow already succeeded.
-          claude_args: "--permission-mode bypassPermissions"
+          # Pinned to Opus regardless of what model implemented the PR -
+          # catching subtle memory/logic bugs benefits from stronger
+          # reasoning, and a review pass is short enough that the extra
+          # cost is small in practice.
+          claude_args: "--permission-mode bypassPermissions --model claude-opus-5"
           prompt: |
             You are reviewing PR #${{ steps.find-pr.outputs.pr_number }} in the
             MyRevoke 2.0 (AI-driven) C++ game engine repo. This PR was just
@@ -87,7 +91,10 @@ jobs:
             Use `gh pr diff ${{ steps.find-pr.outputs.pr_number }}` to see the
             actual changes, and `gh pr view ${{ steps.find-pr.outputs.pr_number }}`
             for the PR description and originating issue link if you need more
-            context.
+            context. For a large diff, delegate the initial read-through to a
+            Task-tool subagent with `model: haiku` - "summarize what changed
+            in each file" - then reason about the summary yourself rather than
+            reading everything at full price.
 
             The PR body follows this repo's template. Read its **Notes for AI
             review** section first and honour it - it is the author telling
@@ -124,8 +131,10 @@ jobs:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           # --resume continues the exact review session above (same context,
           # same findings) rather than having this step rediscover them from
-          # scratch by re-reading PR comments.
-          claude_args: "--permission-mode bypassPermissions --resume ${{ steps.review.outputs.session_id }}"
+          # scratch by re-reading PR comments. Kept on the same model as the
+          # review step - switching models mid-session via --resume isn't a
+          # behavior this is relying on.
+          claude_args: "--permission-mode bypassPermissions --model claude-opus-5 --resume ${{ steps.review.outputs.session_id }}"
           prompt: |
             Now address the findings from the review you just posted on PR
             #${{ steps.find-pr.outputs.pr_number }}.
