@@ -89,7 +89,15 @@ jobs:
             for the PR description and originating issue link if you need more
             context.
 
-            Focus on:
+            The PR body follows this repo's template. Read its **Notes for AI
+            review** section first and honour it - it is the author telling
+            you what to focus on or leave alone for this specific change
+            ("ignore the submodule bump", "check ownership of X carefully",
+            "the duplication is deliberate"). Its **Notes for human review**
+            section is addressed to the human, not you, but read it too so
+            you don't re-raise something already flagged there.
+
+            Otherwise focus on:
             - Correctness: does the code do what it intends? Crashes, null-pointer
               bugs, undefined behavior?
             - Architecture: does it fit the existing engine design (ECS, modular,
