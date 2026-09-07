@@ -103,10 +103,23 @@ jobs:
             1. Break the task into concrete steps if needed
             2. Write code that matches the existing architecture (ECS, Premake, modular design)
             3. Test your assumptions (read the code first, don't guess)
-            4. When done, open a PR with:
-               - Clear title: what changed?
-               - Description: why, what changed, any caveats
-               - Link to the originating issue
+            4. When done, open a PR with a clear title saying what changed.
+               `gh pr create --body` bypasses the repo's PR template, so read
+               `.github/pull_request_template.md` yourself and write the body
+               following that structure - it is the source of truth, use
+               whatever sections it currently has rather than a remembered
+               version. Fill it in properly:
+               - Summary: what changed and why, linking the originating issue
+               - Checklist: tick honestly. There is no test suite yet, so for
+                 tests say how you actually verified the change instead.
+                 Tick "needs close human review" when the change involves a
+                 structural decision or anything you are unsure about.
+               - Notes for AI review: tell the automated reviewer what to
+                 focus on or skip for this specific change
+               - Notes for human review: anything needing a human judgment
+                 call - tradeoffs, scope questions, follow-up work that
+                 should become its own issue, partial fixes
+               Leave a section empty rather than padding it with filler.
 
             **New issue(s) requested** - e.g. "create an issue for X", often
             said in a comment on some other issue or PR. Create them directly
