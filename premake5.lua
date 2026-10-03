@@ -229,7 +229,7 @@ workspace "MyRevoke"
             "%{IncludeDir.OpenAL}",
             "%{IncludeDir.sndfile}",
         }
-
+    
         links
         {
             "MyRevoke"
