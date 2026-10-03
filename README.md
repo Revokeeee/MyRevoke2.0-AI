@@ -61,6 +61,7 @@ Just run the `GenerateProject.bat` file in the root folder. This uses Premake to
 Open the generated `.sln` file in Visual Studio 2026 (or a recent version that supports C++17 or newer).
 3. **Build the solution** (just hit `Ctrl+Shift+B` or use the Build menu).
 4. **Run it!** If everything goes well, you should see a window pop up.
+5. **Run the unit tests** - build the `MyRevoke-Tests` project, then run `bin/<Debug|Release>-windows-x86_64/MyRevoke-Tests/MyRevoke-Tests.exe`. It exits non-zero if any test fails.
 
 > **Note:** You don�t need to mess with CMake or hunt down dependencies�Premake and the submodules handle all that for you. Just make sure you have a modern C++ compiler and Visual Studio installed.
 
