@@ -58,8 +58,15 @@ jobs:
           # the job's `if:` already excludes forks, and github-actions[bot]
           # PRs here come only from this repo's own owner-gated workflows.
           allowed_bots: "github-actions[bot]"
+          # Headless CI has no one to approve tool use, so without an explicit
+          # grant every attempt to post the review is denied and the job still
+          # "succeeds" having posted nothing. This reads PR content written by
+          # an agent, so it gets a narrow allowlist rather than bypassPermissions:
+          # read the code, and the few gh pr commands a review needs.
+          claude_args: >-
+            --allowedTools "Read,Write,Grep,Glob,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr review:*),Bash(gh pr comment:*)"
           prompt: |
-            Review this PR for the MyRevoke C++ game engine.
+            Review PR #${{ github.event.pull_request.number }} for the MyRevoke C++ game engine.
 
             Focus on:
             - Correctness: Does the code do what it intends? Any crashes, null-pointer bugs, UB?
@@ -69,4 +76,12 @@ jobs:
             - Style: Matches the codebase patterns (naming, error handling, smart pointers)?
 
             Be specific: line numbers, what the bug is, why it matters, how to fix it.
-            Approve if no issues, or request changes with concrete suggestions.
+
+            Post the review with exactly one
+            `gh pr review ${{ github.event.pull_request.number }} --comment --body-file <file>`
+            (write the body to a file first to avoid shell quoting problems).
+            Always use --comment, never --approve or --request-changes: agent
+            PRs are authored by the same bot account you run as, and GitHub
+            rejects approving or requesting changes on your own PR. Start the
+            body with a one-line verdict ("No issues found." or "N issues
+            found."), so it's clear the review ran even when it's short.
