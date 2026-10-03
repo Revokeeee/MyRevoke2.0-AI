@@ -226,6 +226,8 @@ workspace "MyRevoke"
             "%{IncludeDir.GLM}",
             "%{IncludeDir.ImGui}",
             "%{IncludeDir.ENTT}",
+            "%{IncludeDir.OpenAL}",
+            "%{IncludeDir.sndfile}",
         }
     
         links
