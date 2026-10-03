@@ -20,3 +20,6 @@
 	path = MyRevoke/vendor/Box2D
 	url = https://github.com/Revokeeee/box2d
 
+[submodule "MyRevoke/vendor/doctest"]
+	path = MyRevoke/vendor/doctest
+	url = https://github.com/doctest/doctest

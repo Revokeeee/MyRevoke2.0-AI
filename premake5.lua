@@ -19,6 +19,7 @@ workspace "MyRevoke"
     IncludeDir ["OpenAL"] = "MyRevoke/vendor/OpenALBuild/include"
     IncludeDir ["sndfile"] = "MyRevoke/vendor/libsndfile/include"
     IncludeDir ["mono"] = "MyRevoke/vendor/mono/include"
+    IncludeDir ["doctest"] = "MyRevoke/vendor/doctest"
 
     LibraryDir = {};
 
@@ -256,6 +257,58 @@ workspace "MyRevoke"
             optimize "On"
 
     
+    project "MyRevoke-Tests"
+        location "MyRevoke-Tests"
+        kind "ConsoleApp"
+        cppdialect "C++20"
+        language "C++"
+        staticruntime "off"
+
+        targetdir ("bin/" .. outputdir .. "/%{prj.name}")
+        objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
+
+        files
+        {
+            "%{prj.name}/src/**.h",
+            "%{prj.name}/src/**.cpp",
+        }
+
+        includedirs
+        {
+            "MyRevoke/vendor/spdlog/include",
+            "MyRevoke/src",
+            "%{IncludeDir.GLM}",
+            "%{IncludeDir.ImGui}",
+            "%{IncludeDir.ENTT}",
+            "%{IncludeDir.OpenAL}",
+            "%{IncludeDir.sndfile}",
+            "%{IncludeDir.doctest}",
+        }
+
+        links
+        {
+            "MyRevoke"
+        }
+
+        filter "system:windows"
+            systemversion "latest"
+
+            defines
+            {
+                "RV_PLATFORM_WINDOWS",
+                "_CRT_SECURE_NO_WARNINGS"
+            }
+
+        filter "configurations:Debug"
+            defines "RV_DEBUG"
+            runtime "Debug"
+            symbols "On"
+
+        filter "configurations:Release"
+            defines "RV_RELEASE"
+            runtime "Release"
+            optimize "On"
+
      project "MyRevoke-ScriptCore"
         location "MyRevoke-ScriptCore"
         kind "SharedLib"
