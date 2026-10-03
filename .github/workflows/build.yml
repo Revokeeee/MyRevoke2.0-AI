@@ -1,0 +1,48 @@
+name: Build
+
+# Build verification only: compiles the engine on every PR and on pushes to
+# main, and fails the check if it doesn't build. There are no tests yet -
+# running a test suite is tracked separately in #9 and #10.
+#
+# Windows runner because premake5.lua hardcodes RV_PLATFORM_WINDOWS and the
+# project is built through generated Visual Studio files. Builds MyRevoke,
+# RevokeCraft and SandBox; the C# and native scripting projects are out of
+# scope (#8).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          submodules: recursive
+
+      - name: Generate Visual Studio solution
+        run: .\vendor\premake\premake5.exe vs2022
+
+      # Locates MSBuild with vswhere, which ships on the runner, instead of
+      # using a setup-msbuild action - this repo only allows actions from a
+      # short allowlist, and this needs nothing outside it.
+      - name: Build
+        run: |
+          $msbuild = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
+          & $msbuild MyRevoke.sln -m -nologo "-t:MyRevoke;RevokeCraft;SandBox" "-p:Configuration=${{ matrix.configuration }}" "-p:Platform=x64"
