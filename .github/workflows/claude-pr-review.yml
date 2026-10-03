@@ -64,7 +64,7 @@ jobs:
           # an agent, so it gets a narrow allowlist rather than bypassPermissions:
           # read the code, and the few gh pr commands a review needs.
           claude_args: >-
-            --allowedTools "Read,Write,Grep,Glob,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr review:*),Bash(gh pr comment:*)"
+            --allowedTools "Read,Write,Grep,Glob,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr review:*)"
           prompt: |
             Review PR #${{ github.event.pull_request.number }} for the MyRevoke C++ game engine.
 
