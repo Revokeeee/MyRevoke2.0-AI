@@ -110,6 +110,7 @@ jobs:
             You are working in the MyRevoke 2.0 (AI-driven) C++ game engine repo.
 
             ## Triggering issue/PR
+            Number: #${{ github.event.issue.number }}
             Title: ${{ github.event.issue.title }}
             URL: ${{ github.event.issue.html_url }}
             Body:
@@ -223,6 +224,45 @@ jobs:
             bugs in existing code while working, fix them and note it - unless
             fixing one would mean a structural change, in which case flag it
             instead.
+
+            ## Writing GitHub Actions workflows
+
+            This repo enforces rules you can't see from the files, so a
+            workflow that ignores them fails before its first step runs:
+
+            - Every `uses:` must be pinned to a full 40-character commit SHA,
+              with the version as a trailing comment, e.g.
+              `uses: actions/checkout@<sha> # v4`. Tags like `@v4` are rejected.
+              Get the SHA with `gh api repos/<owner>/<repo>/commits/<tag> --jq .sha`,
+              which resolves annotated tags to the commit for you.
+            - Only actions from GitHub itself (`actions/*`), verified
+              creators, and `anthropics/*` are allowed.
+            - When you copy conventions from an existing workflow, read the
+              whole file. The pinned `uses:` lines sit below the first 30-40
+              lines, so `head` will miss them.
+            - Check issue numbers you cite in comments against
+              `gh issue view` rather than guessing.
+
+            ## If you cannot finish
+
+            Pushes can be rejected - for example, creating or editing anything
+            under `.github/workflows/` can fail with "without `workflows`
+            permission" - and PR creation can fail too. Your runner is
+            destroyed when this job ends, so a commit that only exists locally
+            is lost and the person reading the Actions log is the only one who
+            will ever know. If a push or `gh pr create` fails, do not retry or
+            hunt for workarounds. Instead, post one comment on #${{ github.event.issue.number }}
+            with `gh issue comment ${{ github.event.issue.number }} --body-file <file>`
+            (write the body to a temp file first; it avoids shell quoting
+            problems) that contains:
+
+            1. What you were asked to do and what you finished.
+            2. The exact error message.
+            3. The full content of every file you created or changed, in
+               fenced code blocks (or `git diff origin/main...HEAD` if that
+               is shorter), so a human can apply it without re-deriving
+               anything. If it exceeds GitHub's 65,000-character comment
+               limit, split it across several comments.
 
             You never merge pull requests, and you never approve them - a
             human always makes that call.
