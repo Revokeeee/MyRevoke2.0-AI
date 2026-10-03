@@ -52,6 +52,12 @@ jobs:
           # The action needs exactly one of them to be non-empty.
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # The Claude agent opens its PRs as github-actions[bot], and the
+          # action refuses bot actors by default - without this, the required
+          # claude-review check fails on every agent PR. Only this one bot:
+          # the job's `if:` already excludes forks, and github-actions[bot]
+          # PRs here come only from this repo's own owner-gated workflows.
+          allowed_bots: "github-actions[bot]"
           prompt: |
             Review this PR for the MyRevoke C++ game engine.
 
