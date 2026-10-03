@@ -1,13 +1,18 @@
 name: Build
 
-# Build verification only: compiles the engine on every PR and on pushes to
-# main, and fails the check if it doesn't build. There are no tests yet -
-# running a test suite is tracked separately in #9 and #10.
+# Build and test, on every PR and on pushes to main. Two stages, in order:
+#   1. "Build" - compiles MyRevoke, RevokeCraft, SandBox and MyRevoke-Tests.
+#      A compile or link error fails here, and the tests never run.
+#   2. "Test"  - runs MyRevoke-Tests. Fails if any test fails or the binary
+#      crashes; doctest prints each failing assertion to this log.
 #
 # Windows runner because premake5.lua hardcodes RV_PLATFORM_WINDOWS and the
-# project is built through generated Visual Studio files. Builds MyRevoke,
-# RevokeCraft and SandBox; the C# and native scripting projects are out of
-# scope (#8).
+# project is built through generated Visual Studio files. The C# and native
+# scripting projects are out of scope (#8).
+#
+# Keep the job named `build`: main's branch protection requires the checks
+# "build (Debug)" and "build (Release)", and renaming the job would leave
+# them waiting forever on every PR.
 
 on:
   push:
@@ -45,4 +50,7 @@ jobs:
       - name: Build
         run: |
           $msbuild = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -requires Microsoft.Component.MSBuild -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
-          & $msbuild MyRevoke.sln -m -nologo "-t:MyRevoke;RevokeCraft;SandBox" "-p:Configuration=${{ matrix.configuration }}" "-p:Platform=x64"
+          & $msbuild MyRevoke.sln -m -nologo "-t:MyRevoke;RevokeCraft;SandBox;MyRevoke-Tests" "-p:Configuration=${{ matrix.configuration }}" "-p:Platform=x64"
+
+      - name: Test
+        run: .\bin\${{ matrix.configuration }}-windows-x86_64\MyRevoke-Tests\MyRevoke-Tests.exe
