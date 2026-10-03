@@ -17,8 +17,10 @@ namespace Revoke
 	
 
 	Application::Application()
-	
+
 	{
+		Log::Init();
+
 		ALuint test = 2;
 		RV_CORE_ASSERT(!s_Instance, "Application already exist");
 		s_Instance = this;

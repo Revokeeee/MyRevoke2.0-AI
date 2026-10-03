@@ -11,6 +11,9 @@ namespace Revoke
 
 	void Log::Init()
 	{
+		if (s_EngineLogger)
+			return;
+
 		spdlog::set_pattern("%^[%T] %n: %v%$");
 		s_EngineLogger = spdlog::stdout_color_mt("MYREVOKE");
 		s_EngineLogger->set_level(spdlog::level::trace);
