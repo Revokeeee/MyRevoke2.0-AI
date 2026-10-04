@@ -9,7 +9,7 @@ Entities:
       Scale: [0.999999881, 0.999999881, 1]
     SpriteRendererComponent:
       Color: [1, 1, 1, 1]
-      Texture2D: assets\Textures\Triangle.png
+      Texture2D: Textures\Triangle.png
     RigidBodyComponent:
       BodyType: 2
       IsRotating: true
@@ -30,7 +30,7 @@ Entities:
       Scale: [19.6652164, 0.213340834, 1]
     SpriteRendererComponent:
       Color: [0.76758939, 1, 0.745097995, 1]
-      Texture2D: assets\Textures\Square_Texture.png
+      Texture2D: Textures\Square_Texture.png
     RigidBodyComponent:
       BodyType: 0
       IsRotating: true
@@ -51,7 +51,7 @@ Entities:
       Scale: [0.954158843, 1.14277911, 0.089999944]
     SpriteRendererComponent:
       Color: [0.650519013, 0.230392143, 0.691176474, 1]
-      Texture2D: assets\Textures\Square1_Texture.png
+      Texture2D: Textures\Square1_Texture.png
     RigidBodyComponent:
       BodyType: 2
       IsRotating: false
@@ -64,7 +64,7 @@ Entities:
       ResitutionTreshhold: 0.5
       isSensor: false
     SoundComponent:
-      AudioPath: assets\Audio\magicfail.ogg
+      AudioPath: Audio\magicfail.ogg
       Pitch: 1
       Gain: 1
       Position: [0, 0, 0]
@@ -98,7 +98,7 @@ Entities:
       Rotation: [0, 0, 0]
       Scale: [1, 1, 1]
     SoundComponent:
-      AudioPath: assets\Audio\magicfail.ogg
+      AudioPath: Audio\magicfail.ogg
       Pitch: 1
       Gain: 1
       Position: [0, 0, 0]
@@ -113,7 +113,7 @@ Entities:
       Scale: [1.04529703, 0.999998927, 1]
     SpriteRendererComponent:
       Color: [1, 1, 1, 1]
-      Texture2D: assets\Textures\floor.jfif
+      Texture2D: Textures\floor.jfif
     RigidBodyComponent:
       BodyType: 2
       IsRotating: false
@@ -134,7 +134,7 @@ Entities:
       Scale: [2.02005839, 1, 1]
     SpriteRendererComponent:
       Color: [1, 1, 1, 1]
-      Texture2D: assets\Textures\block.png
+      Texture2D: Textures\block.png
     RigidBodyComponent:
       BodyType: 2
       IsRotating: true

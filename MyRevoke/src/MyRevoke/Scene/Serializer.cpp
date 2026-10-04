@@ -102,7 +102,30 @@ namespace Revoke
 		return out;
 	}
 
-    static void SerializeEntity(YAML::Emitter& out, Entity entity)
+	// Components hold absolute asset paths while a scene is open; the scene file stores them
+	// relative to the project's assets folder. An empty assets folder means "leave the path alone".
+	static std::string ToStoredAssetPath(const std::string& absolutePath, const std::filesystem::path& assetsDirectory)
+	{
+		if (absolutePath.empty() || assetsDirectory.empty())
+			return absolutePath;
+
+		// relative() gives up (empty path) when the asset sits on another drive - keep it absolute then.
+		std::filesystem::path relativePath = std::filesystem::relative(absolutePath, assetsDirectory);
+		if (relativePath.empty())
+			return absolutePath;
+
+		return relativePath.string();
+	}
+
+	static std::string ToLoadedAssetPath(const std::string& storedPath, const std::filesystem::path& assetsDirectory)
+	{
+		if (storedPath.empty() || assetsDirectory.empty())
+			return storedPath;
+
+		return (assetsDirectory / storedPath).string();
+	}
+
+    static void SerializeEntity(YAML::Emitter& out, Entity entity, const std::filesystem::path& assetsDirectory)
 	{
 		out << YAML::BeginMap; // Entity
 		out << YAML::Key << "Entity" << YAML::Value << entity.GetComponent<IdComponent>().ID; 
@@ -163,7 +186,7 @@ namespace Revoke
 		
 			auto& spriteRendererComponent = entity.GetComponent<SpriteRendererComponent>();
 			out << YAML::Key << "Color" << YAML::Value << spriteRendererComponent.Color;
-			out << YAML::Key << "Texture2D" << YAML::Value << spriteRendererComponent.Texture2D;
+			out << YAML::Key << "Texture2D" << YAML::Value << ToStoredAssetPath(spriteRendererComponent.Texture2D, assetsDirectory);
 		
 			out << YAML::EndMap; 
 		}
@@ -204,7 +227,7 @@ namespace Revoke
 			out << YAML::BeginMap;
 
 			auto& soundComponent = entity.GetComponent<SoundComponent>();
-			out << YAML::Key << "AudioPath" << YAML::Value << soundComponent.AudioPath;
+			out << YAML::Key << "AudioPath" << YAML::Value << ToStoredAssetPath(soundComponent.AudioPath, assetsDirectory);
 
 			out << YAML::Key << "Pitch" << YAML::Value << soundComponent.Pitch;
 			out << YAML::Key << "Gain" << YAML::Value << soundComponent.Gain;
@@ -229,8 +252,8 @@ namespace Revoke
 		out << YAML::EndMap; // Entity
 	}
 
-    Serializer::Serializer(const Shared<Scene> scene)
-        :m_Scene(scene)
+    Serializer::Serializer(const Shared<Scene> scene, const std::filesystem::path& assetsDirectory)
+        :m_Scene(scene), m_AssetsDirectory(assetsDirectory)
     {
     }
     std::string Serializer::SerializeToString()
@@ -245,7 +268,7 @@ namespace Revoke
                 if (!entity)
                     return;
 
-                SerializeEntity(out, entity);
+                SerializeEntity(out, entity, m_AssetsDirectory);
             });
         out << YAML::EndSeq;
         out << YAML::EndMap;
@@ -319,7 +342,7 @@ namespace Revoke
 				{
 					auto& src = deserializedEntity.AddComponent<SpriteRendererComponent>();
 					src.Color = spriteRendererComponent["Color"].as<glm::vec4>();
-					src.Texture2D = spriteRendererComponent["Texture2D"].as<std::string>();
+					src.Texture2D = ToLoadedAssetPath(spriteRendererComponent["Texture2D"].as<std::string>(), m_AssetsDirectory);
 				}
 
 				auto rigitbodyComponent = entity["RigidBodyComponent"];
@@ -357,7 +380,7 @@ namespace Revoke
 
 					src.LoopSound = soundComponent["LoopSound"].as<bool>();
 
-					src.SetPath(soundComponent["AudioPath"].as<std::string>());
+					src.SetPath(ToLoadedAssetPath(soundComponent["AudioPath"].as<std::string>(), m_AssetsDirectory));
 
 					
 				}

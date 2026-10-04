@@ -13,8 +13,6 @@
 
 namespace Revoke
 {
-	extern const std::filesystem::path g_AssetsDirectory = GetExecutableDirectory() / "assets";
-
 	namespace Utils
 	{
 		static bool IsPayloadScene(const wchar_t* path) {
@@ -67,7 +65,7 @@ namespace Revoke
 		RendererAPI::SetClearColor({ 0.2f, 0.2f, 0.2f, 1.0f });
 		RendererAPI::EnableBlending();
 
-		
+		OpenProject(GetExecutableDirectory() / "projects" / "Example" / "Example.mrproject");
 	}
 	void CraftLayer::OnDetach()
 	{
@@ -174,6 +172,8 @@ namespace Revoke
 			if (ImGui::BeginMenu("File"))
 			{
 				if (ImGui::MenuItem("Exit")) Application::Get().Close();
+				if (ImGui::MenuItem("New Project")) NewProject();
+				if (ImGui::MenuItem("Open Project")) OpenProject();
 				if (ImGui::MenuItem("New Scene", "Ctrl+N")) NewScene();
 				if (ImGui::MenuItem("Open", "Ctrl+O")) OpenScene();
 				if (ImGui::MenuItem("Save", "Ctrl+S")) Save();
@@ -222,7 +222,7 @@ namespace Revoke
 
 				if (Utils::IsPayloadScene(path))
 				{
-					OpenScene(std::filesystem::path(g_AssetsDirectory) / path);
+					OpenScene(GetAssetsDirectory() / path);
 				}
 				else
 				{
@@ -358,6 +358,51 @@ namespace Revoke
 	}
 
 	//------------------------------------------------------------------------
+	void CraftLayer::NewProject()
+	{
+		std::string path = FileExplorer::SaveFile("MyRevoke Project (*.mrproject)\0*.mrproject\0");
+
+		if (!path.empty())
+		{
+			std::filesystem::path chosenPath(path);
+			SetProject(Project::Create(chosenPath.stem().string(), chosenPath.parent_path()));
+		}
+	}
+
+	void CraftLayer::OpenProject()
+	{
+		std::string path = FileExplorer::OpenFile("MyRevoke Project (*.mrproject)\0*.mrproject\0");
+
+		if (!path.empty())
+		{
+			OpenProject(std::filesystem::path(path));
+		}
+	}
+
+	void CraftLayer::OpenProject(const std::filesystem::path& projectFilePath)
+	{
+		Shared<Project> project = Project::Load(projectFilePath);
+
+		if (project)
+		{
+			SetProject(project);
+		}
+	}
+
+	std::filesystem::path CraftLayer::GetAssetsDirectory() const
+	{
+		return m_Project ? m_Project->GetAssetsDirectory() : std::filesystem::path();
+	}
+
+	void CraftLayer::SetProject(Shared<Project> project)
+	{
+		m_Project = project;
+		m_ContentBrowserPanel.SetAssetsDirectory(project->GetAssetsDirectory());
+		m_ObjPannel.SetAssetsDirectory(project->GetAssetsDirectory());
+
+		NewScene();
+	}
+
 	void CraftLayer::NewScene()
 	{
 		m_Scene = std::make_shared<Scene>("New scene");
@@ -387,7 +432,7 @@ namespace Revoke
 		m_Scene->OnSceneClose();
 		m_Scene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
 		
-		Serializer sceneSerializer(m_Scene);
+		Serializer sceneSerializer(m_Scene, GetAssetsDirectory());
  		sceneSerializer.DeSerealize(path.string());
 
 		m_ObjPannel.SetScene(m_Scene);
@@ -398,19 +443,28 @@ namespace Revoke
 
 	void CraftLayer::SaveAs()
 	{
-		std::string path = FileExplorer::SaveFile("Hazel Scene (*.myrevoke)\0*.myrevoke\0");
+		std::string path = FileExplorer::SaveFile("MyRevoke Scene (*.myrevoke)\0*.myrevoke\0");
 
 		if (!path.empty())
 		{
-			Serializer sceneSerializer(m_Scene);
+			Serializer sceneSerializer(m_Scene, GetAssetsDirectory());
 			sceneSerializer.Serealize(path+".myrevoke");
 		}
 	}
 
 	void CraftLayer::Save()
 	{
-		Serializer sceneSerializer(m_Scene);
-		sceneSerializer.Serealize((g_AssetsDirectory / "Scenes" / (m_Scene->GetName() + ".myrevoke")).string());
+		if (!m_Project)
+		{
+			RV_EDITOR_ERROR("No project open - use Save as to pick a file");
+			return;
+		}
+
+		std::filesystem::path scenesDirectory = m_Project->GetScenesDirectory();
+		std::filesystem::create_directories(scenesDirectory);
+
+		Serializer sceneSerializer(m_Scene, GetAssetsDirectory());
+		sceneSerializer.Serealize((scenesDirectory / (m_Scene->GetName() + ".myrevoke")).string());
 	}
 
 }

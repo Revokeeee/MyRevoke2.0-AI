@@ -16,7 +16,7 @@ path.
   time each frame and hot-reloads it via `OnDllUpdate()`; `GetScritpByName(name)` calls
   `GetProcAddress` for an exported factory function (e.g. `Player`) and invokes it to construct a
   `ScriptEntity*`.
-- Real example: [`RevokeCraft/assets/Scripts/ScriptExample.h`/`.cpp`](../../../../RevokeCraft/assets/Scripts)
+- Real example: [`ScriptExample.h`/`.cpp` in the example project](../../../../RevokeCraft/projects/Example/assets/Scripts)
   — a `PlayerScript` plus an exported `extern "C" __declspec(dllexport) ScriptEntity* Player()`
   factory, which is what `GetScritpByName("Player")` finds.
 - The actual DLL project that gets built and hot-loaded is

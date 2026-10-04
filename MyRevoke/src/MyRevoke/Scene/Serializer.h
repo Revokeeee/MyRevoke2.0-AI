@@ -1,5 +1,7 @@
 #pragma once
 
+#include <filesystem>
+
 #include "Scene.h"
 
 
@@ -8,7 +10,9 @@ namespace Revoke {
 	class Serializer
 	{
 	public:
-		Serializer(const Shared<Scene> scene);
+		// Asset paths are stored relative to the assets folder so a project stays valid when it is
+		// moved. An empty folder leaves them as they are.
+		Serializer(const Shared<Scene> scene, const std::filesystem::path& assetsDirectory = {});
 
 		// File-based API, unchanged for existing callers.
 		void Serealize(const std::string& path);
@@ -20,6 +24,7 @@ namespace Revoke {
 
 	private:
 		Shared<Scene> m_Scene;
+		std::filesystem::path m_AssetsDirectory;
 	};
 
 }

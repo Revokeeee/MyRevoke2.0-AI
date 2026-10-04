@@ -152,8 +152,8 @@ workspace "MyRevoke"
         language "C++"
         staticruntime "off"
     
-        -- The editor finds assets/, resourses/ and mono/ next to its own exe, so it builds into the
-        -- folder that already holds them rather than into bin/.
+        -- The editor finds resourses/, mono/ and the example project next to its own exe, so it
+        -- builds into the folder that already holds them rather than into bin/.
         targetdir ("%{prj.name}")
         objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
     
@@ -356,8 +356,8 @@ workspace "MyRevoke"
             
             "%{prj.name}/src/**.h",
             "%{prj.name}/src/**.cpp",
-            "RevokeCraft/assets/Scripts/**.h",
-            "RevokeCraft/assets/Scripts/**.cpp",
+            "RevokeCraft/projects/Example/assets/Scripts/**.h",
+            "RevokeCraft/projects/Example/assets/Scripts/**.cpp",
         }
         includedirs
         {

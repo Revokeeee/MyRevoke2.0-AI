@@ -8,7 +8,6 @@
 #include "MyRevoke/Core/UniversallyUniqueIdentifiers.h"
 
 #include "MyRevoke/AudioManager/AudioRenderer.h"
-#include "MyRevoke/Utility/ExecutablePath.h"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/quaternion.hpp>
@@ -166,8 +165,7 @@ namespace Revoke
 			AudioPath = audioPath;
 			if (!AudioPath.empty())
 			{
-				std::string fullPath = (GetExecutableDirectory() / AudioPath).string();
-				BufferID = AudioRenderer::CreateSoundBuffer(fullPath.c_str());
+				BufferID = AudioRenderer::CreateSoundBuffer(AudioPath.c_str());
 				SourceID = AudioRenderer::CreateSoundSource(Pitch, Gain, Position, Velocity, LoopSound, BufferID);
 			}
 		}

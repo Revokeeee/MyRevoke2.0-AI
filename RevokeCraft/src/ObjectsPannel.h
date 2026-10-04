@@ -13,6 +13,7 @@ namespace Revoke
 		ObjectsPannel(Shared<Scene> currentScene);
 
 		void SetScene(Shared<Scene> currentScene);
+		void SetAssetsDirectory(const std::filesystem::path& assetsDirectory) { m_AssetsDirectory = assetsDirectory; }
 		void OnImGuiRender();
 
 		void SceneHierarchyWindow(Entity entity);
@@ -22,6 +23,7 @@ namespace Revoke
 		Entity GetSelectedEntity() const { return m_SelectedEntity; }
 	private:
 		Shared<Scene> m_CurrentScene;
+		std::filesystem::path m_AssetsDirectory;
 		Entity m_SelectedEntity;
 	};
 }
