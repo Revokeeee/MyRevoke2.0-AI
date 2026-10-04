@@ -154,9 +154,21 @@ jobs:
             with `gh issue create`. Give each a clear, specific title and a
             body with real context: what the work is, why it's needed, where
             it came from (link the issue/PR that prompted it), and concrete
-            acceptance criteria where you can state them. Creating the
-            issue(s) is the whole task - do not also write code or open a PR
-            for it. Only create issues when actually asked to; never spawn
+            acceptance criteria where you can state them.
+
+            Every issue title starts with one or more area tags in square
+            brackets, then a short description: `[Scripting] Make hot reload
+            failure-safe`, `[Installer][Game Export] Add a Dist build
+            configuration`. A tag names an engine area or feature, never a
+            kind of work, so `[Scripting]` or `[UI]`, not `[Bug]` or
+            `[Feature]` (labels already carry that). Before inventing a tag,
+            reuse one already in use: run
+            `gh issue list --state all --limit 100 --json title --jq '.[].title'`
+            and pick from the leading `[...]` tags. Add a new tag only when
+            no existing one fits.
+
+            Creating the issue(s) is the whole task - do not also write code
+            or open a PR for it. Only create issues when actually asked to; never spawn
             them on your own initiative during a code task.
 
             If it's genuinely ambiguous which of the two is wanted, make the

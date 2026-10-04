@@ -1,0 +1,39 @@
+name: Task
+description: A feature, improvement or piece of cleanup
+title: "[Area] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Start the title with an area tag in square brackets, like `[Scripting]` or `[UI]`.
+        A tag names an engine area or feature, not a kind of work. Reuse a tag that's
+        already in use where one fits. Add the `ai-task` label if the Claude agent should
+        pick this up.
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What's the situation today, and why does it matter?
+    validations:
+      required: true
+  - type: textarea
+    id: what-to-do
+    attributes:
+      label: What to do
+      description: The change you want, as specifically as you can.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: How will we know it's done? Each item should be checkable.
+      placeholder: "- The editor starts with ...\n- ..."
+    validations:
+      required: true
+  - type: textarea
+    id: depends-on
+    attributes:
+      label: Depends on
+      description: Issues that must land first, if any (e.g. #12).
