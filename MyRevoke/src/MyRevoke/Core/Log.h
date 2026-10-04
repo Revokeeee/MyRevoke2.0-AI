@@ -14,11 +14,11 @@ namespace Revoke{
 		static void Init();
 
 		static Shared<spdlog::logger> GetCoreLogger() { return s_EngineLogger; }
-		static Shared<spdlog::logger> GetClientLogger() { return s_EditortLogger; }
+		static Shared<spdlog::logger> GetClientLogger() { return s_EditorLogger; }
 
 	private:
 		static Shared<spdlog::logger> s_EngineLogger;
-		static Shared<spdlog::logger> s_EditortLogger;
+		static Shared<spdlog::logger> s_EditorLogger;
 	};
 }
 

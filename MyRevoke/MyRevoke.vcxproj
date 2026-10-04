@@ -121,7 +121,7 @@
     <ClInclude Include="src\MyRevoke\ImGui\ImGuiLayer.h" />
     <ClInclude Include="src\MyRevoke\Math\Math.h" />
     <ClInclude Include="src\MyRevoke\Renderer\BuffersAPI.h" />
-    <ClInclude Include="src\MyRevoke\Renderer\Cmaera.h" />
+    <ClInclude Include="src\MyRevoke\Renderer\Camera.h" />
     <ClInclude Include="src\MyRevoke\Renderer\EditorCamera.h" />
     <ClInclude Include="src\MyRevoke\Renderer\FrameBuffers.h" />
     <ClInclude Include="src\MyRevoke\Renderer\GraphicContex.h" />
@@ -133,7 +133,7 @@
     <ClInclude Include="src\MyRevoke\Scene\Entity.h" />
     <ClInclude Include="src\MyRevoke\Scene\Scene.h" />
     <ClInclude Include="src\MyRevoke\Scene\SceneCamera.h" />
-    <ClInclude Include="src\MyRevoke\Scene\Serealizer.h" />
+    <ClInclude Include="src\MyRevoke\Scene\Serializer.h" />
     <ClInclude Include="src\MyRevoke\Scripting\NativeScript.h" />
     <ClInclude Include="src\MyRevoke\Scripting\ScriptConnector.h" />
     <ClInclude Include="src\MyRevoke\Scripting\ScriptCore.h" />
@@ -585,7 +585,7 @@
     <ClCompile Include="src\MyRevoke\Scene\Entity.cpp" />
     <ClCompile Include="src\MyRevoke\Scene\Scene.cpp" />
     <ClCompile Include="src\MyRevoke\Scene\SceneCamera.cpp" />
-    <ClCompile Include="src\MyRevoke\Scene\Serealizer.cpp" />
+    <ClCompile Include="src\MyRevoke\Scene\Serializer.cpp" />
     <ClCompile Include="src\MyRevoke\Scripting\NativeScript.cpp" />
     <ClCompile Include="src\MyRevoke\Scripting\ScriptConnector.cpp" />
     <ClCompile Include="src\MyRevoke\Scripting\ScriptCore.cpp" />

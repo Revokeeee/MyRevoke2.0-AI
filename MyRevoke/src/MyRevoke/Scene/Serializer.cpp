@@ -1,5 +1,5 @@
 #include "rvpch.h"
-#include "Serealizer.h"
+#include "Serializer.h"
 
 #include "Components.h"
 #include <yaml-cpp/yaml.h>
@@ -181,12 +181,12 @@ namespace Revoke
 			out << YAML::EndMap;
 		}
 
-		if (entity.HasComponent<BoxColisionComponent>())
+		if (entity.HasComponent<BoxCollisionComponent>())
 		{
-			out << YAML::Key << "BoxColisionComponent";
+			out << YAML::Key << "BoxCollisionComponent";
 			out << YAML::BeginMap; 
 
-			auto& boxColisionComponent = entity.GetComponent<BoxColisionComponent>();
+			auto& boxColisionComponent = entity.GetComponent<BoxCollisionComponent>();
 			out << YAML::Key << "Offset" << YAML::Value << boxColisionComponent.Offset;
 			out << YAML::Key << "Size" << YAML::Value << boxColisionComponent.Size;
 
@@ -229,11 +229,11 @@ namespace Revoke
 		out << YAML::EndMap; // Entity
 	}
 
-    Serealizer::Serealizer(const Shared<Scene> scene)
+    Serializer::Serializer(const Shared<Scene> scene)
         :m_Scene(scene)
     {
     }
-    void Serealizer::Serealize(const std::string& path)
+    void Serializer::Serealize(const std::string& path)
     {
         YAML::Emitter out;
         out << YAML::BeginMap;
@@ -255,7 +255,7 @@ namespace Revoke
     }
 
 
-    bool Serealizer::DeSerealize(const std::string& path)
+    bool Serializer::DeSerealize(const std::string& path)
     {
 		std::ifstream stream(path);
 		std::stringstream strStream;
@@ -329,10 +329,10 @@ namespace Revoke
 					src.IsRotating = rigitbodyComponent["IsRotating"].as<bool>();
 				}
 
-				auto boxColisionComponent = entity["BoxColisionComponent"];
+				auto boxColisionComponent = entity["BoxCollisionComponent"];
 				if (boxColisionComponent)
 				{
-					auto& src = deserializedEntity.AddComponent<BoxColisionComponent>();
+					auto& src = deserializedEntity.AddComponent<BoxCollisionComponent>();
 					src.Size = boxColisionComponent["Size"].as<glm::vec2>();
 					src.Offset = boxColisionComponent["Offset"].as<glm::vec2>();
 

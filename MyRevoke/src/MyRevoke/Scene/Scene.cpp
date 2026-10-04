@@ -86,9 +86,9 @@ namespace Revoke
 
             rigitBody.Body = body;
 
-            if (entity.HasComponent<BoxColisionComponent>())
+            if (entity.HasComponent<BoxCollisionComponent>())
             {
-                auto& boxColidor = entity.GetComponent<BoxColisionComponent>();
+                auto& boxColidor = entity.GetComponent<BoxCollisionComponent>();
 
                 b2PolygonShape shape;
                 shape.SetAsBox(transforms.Scale.x * boxColidor.Size.x, transforms.Scale.y * boxColidor.Size.y);
@@ -335,7 +335,7 @@ namespace Revoke
 
     }
     template<>
-    void Scene::OnComponentAdded<BoxColisionComponent>(Entity entity, BoxColisionComponent& component)
+    void Scene::OnComponentAdded<BoxCollisionComponent>(Entity entity, BoxCollisionComponent& component)
     {
 
     }

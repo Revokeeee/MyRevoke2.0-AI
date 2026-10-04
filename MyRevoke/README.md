@@ -50,11 +50,10 @@ OpenAL + libsndfile (audio), Mono (embedded C# runtime).
 A handful of names in this tree don't match what they mean — useful to know so a search for the
 "real" name doesn't come up empty:
 
-- `Renderer/Cmaera.h` (base `Camera` class) and `Renderer/GraphicContex.h`/`RenderContex` (should read
-  "Camera"/"GraphicsContext"/"RenderContext").
-- `Scene/Serealizer.h`/`.cpp` (should read "Serializer") and `Scene/Components.h`'s
-  `BoxColisionComponent` (should read "Collision").
-- `Core/Log.h`'s `s_EditortLogger` (should read "Editor").
+- `Renderer/GraphicContex.h`/`RenderContex` (should read "GraphicsContext"/"RenderContext").
+
+The `Renderer/Camera.h`, `Scene/Serializer.h`/`.cpp`, `BoxCollisionComponent`, and `Core/Log.h`'s
+editor-logger naming typos noted here previously have since been fixed.
 
 None of these are functional bugs — see each module's README for details and for the handful of
 actual bugs found while exploring (dangling pointers, leaked buffers, etc.), which are called out

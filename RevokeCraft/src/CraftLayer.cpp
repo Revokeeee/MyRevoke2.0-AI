@@ -386,8 +386,8 @@ namespace Revoke
 		m_Scene->OnSceneClose();
 		m_Scene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
 		
-		Serealizer sceneSerealizer(m_Scene);
- 		sceneSerealizer.DeSerealize(path.string());
+		Serializer sceneSerializer(m_Scene);
+ 		sceneSerializer.DeSerealize(path.string());
 
 		m_ObjPannel.SetScene(m_Scene);
 		m_ToolBar.SetScene(m_Scene);
@@ -401,15 +401,15 @@ namespace Revoke
 
 		if (!path.empty())
 		{
-			Serealizer sceneSerealizer(m_Scene);
-			sceneSerealizer.Serealize(path+".myrevoke");
+			Serializer sceneSerializer(m_Scene);
+			sceneSerializer.Serealize(path+".myrevoke");
 		}
 	}
 
 	void CraftLayer::Save()
 	{
-		Serealizer sceneSerealizer(m_Scene);
-		sceneSerealizer.Serealize("assets/Scenes/" + m_Scene->GetName() + ".myrevoke");
+		Serializer sceneSerializer(m_Scene);
+		sceneSerializer.Serealize("assets/Scenes/" + m_Scene->GetName() + ".myrevoke");
 	}
 
 }
