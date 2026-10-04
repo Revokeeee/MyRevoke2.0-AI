@@ -123,7 +123,7 @@
     <ClInclude Include="src\MyRevoke\Renderer\BuffersAPI.h">
       <Filter>src\MyRevoke\Renderer</Filter>
     </ClInclude>
-    <ClInclude Include="src\MyRevoke\Renderer\Cmaera.h">
+    <ClInclude Include="src\MyRevoke\Renderer\Camera.h">
       <Filter>src\MyRevoke\Renderer</Filter>
     </ClInclude>
     <ClInclude Include="src\MyRevoke\Renderer\EditorCamera.h">
@@ -159,7 +159,7 @@
     <ClInclude Include="src\MyRevoke\Scene\SceneCamera.h">
       <Filter>src\MyRevoke\Scene</Filter>
     </ClInclude>
-    <ClInclude Include="src\MyRevoke\Scene\Serealizer.h">
+    <ClInclude Include="src\MyRevoke\Scene\Serializer.h">
       <Filter>src\MyRevoke\Scene</Filter>
     </ClInclude>
     <ClInclude Include="src\MyRevoke\Scripting\NativeScript.h">
@@ -1511,7 +1511,7 @@
     <ClCompile Include="src\MyRevoke\Scene\SceneCamera.cpp">
       <Filter>src\MyRevoke\Scene</Filter>
     </ClCompile>
-    <ClCompile Include="src\MyRevoke\Scene\Serealizer.cpp">
+    <ClCompile Include="src\MyRevoke\Scene\Serializer.cpp">
       <Filter>src\MyRevoke\Scene</Filter>
     </ClCompile>
     <ClCompile Include="src\MyRevoke\Scripting\NativeScript.cpp">

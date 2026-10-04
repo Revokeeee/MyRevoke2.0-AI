@@ -331,11 +331,11 @@ namespace Revoke
 				}
 			}
 
-			if (m_SelectedEntity.HasComponent<BoxColisionComponent>())
+			if (m_SelectedEntity.HasComponent<BoxCollisionComponent>())
 			{
-				if (ImGui::TreeNodeEx((void*)typeid(BoxColisionComponent).hash_code(), ImGuiTreeNodeFlags_DefaultOpen, "Colisions"))
+				if (ImGui::TreeNodeEx((void*)typeid(BoxCollisionComponent).hash_code(), ImGuiTreeNodeFlags_DefaultOpen, "Colisions"))
 				{
-					auto& boxCollisionComponent = m_SelectedEntity.GetComponent<BoxColisionComponent>();
+					auto& boxCollisionComponent = m_SelectedEntity.GetComponent<BoxCollisionComponent>();
 
 					ImGui::DragFloat2("Size", glm::value_ptr(boxCollisionComponent.Size), 0.1f);
 					ImGui::DragFloat2("Offset", glm::value_ptr(boxCollisionComponent.Offset), 0.1f);
@@ -489,9 +489,9 @@ namespace Revoke
 				}
 				if (ImGui::MenuItem("Box Colidor"))
 				{
-					if (!m_SelectedEntity.HasComponent<BoxColisionComponent>())
+					if (!m_SelectedEntity.HasComponent<BoxCollisionComponent>())
 					{
-					m_SelectedEntity.AddComponent<BoxColisionComponent>();
+					m_SelectedEntity.AddComponent<BoxCollisionComponent>();
 					}
 					else
 					{

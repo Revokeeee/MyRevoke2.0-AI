@@ -14,7 +14,7 @@ single `CraftLayer`, and implements the `Revoke::CreateApplication()` factory re
 
 | File | Draws | Talks to |
 |---|---|---|
-| `CraftLayer.h`/`.cpp` | Dockspace, menu bar, viewport, gizmo manipulation | Owns the `Scene`, `EditorCamera`, framebuffer (for mouse picking via `ReadPixel`), and all the other panels; scene file I/O via `Serealizer`/`FileExplorer` |
+| `CraftLayer.h`/`.cpp` | Dockspace, menu bar, viewport, gizmo manipulation | Owns the `Scene`, `EditorCamera`, framebuffer (for mouse picking via `ReadPixel`), and all the other panels; scene file I/O via `Serializer`/`FileExplorer` |
 | `ObjectsPannel.h`/`.cpp` *(sic — "Panel")* | "Scene Hierarchy" + "Properties" | Iterates `Scene`'s registry, per-component property editors, "Add Component" popup |
 | `ContentBrowser.h`/`.cpp` | "Content Browser" | Icon grid over the `assets/` directory tree; drag-and-drop source for textures/audio/scripts |
 | `SceneSettingsPannel.h`/`.cpp` *(sic)* | "Scene Settings" | Clear color, blending toggle, physics iteration counts, "Build Scripts" (`msbuild` on `MyRevoke-NativeScriptCore`) |

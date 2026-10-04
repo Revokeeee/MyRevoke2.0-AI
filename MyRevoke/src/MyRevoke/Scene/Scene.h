@@ -63,7 +63,7 @@ namespace Revoke
 
 		friend class Entity;
 		friend class ObjectsPannel;
-		friend class Serealizer;
+		friend class Serializer;
 	};
 
 }

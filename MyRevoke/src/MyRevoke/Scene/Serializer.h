@@ -5,10 +5,10 @@
 
 namespace Revoke {
 
-	class Serealizer
+	class Serializer
 	{
 	public:
-		Serealizer(const Shared<Scene> scene);
+		Serializer(const Shared<Scene> scene);
 		void Serealize(const std::string& path);
 		bool DeSerealize(const std::string& path);
 
