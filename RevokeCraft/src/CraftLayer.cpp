@@ -4,6 +4,7 @@
 #include <string>
 
 #include "MyRevoke/Utility/FileExplorer.h"
+#include "MyRevoke/Utility/ExecutablePath.h"
 #include "MyRevoke/Math/Math.h"
 #include "MyRevoke/AudioManager/AudioRenderer.h"
 #include "MyRevoke/Scripting/NativeScript.h"
@@ -12,7 +13,7 @@
 
 namespace Revoke
 {
-	extern const std::filesystem::path g_AssetsDirectory = "assets";
+	extern const std::filesystem::path g_AssetsDirectory = GetExecutableDirectory() / "assets";
 
 	namespace Utils
 	{
@@ -409,7 +410,7 @@ namespace Revoke
 	void CraftLayer::Save()
 	{
 		Serializer sceneSerializer(m_Scene);
-		sceneSerializer.Serealize("assets/Scenes/" + m_Scene->GetName() + ".myrevoke");
+		sceneSerializer.Serealize((g_AssetsDirectory / "Scenes" / (m_Scene->GetName() + ".myrevoke")).string());
 	}
 
 }

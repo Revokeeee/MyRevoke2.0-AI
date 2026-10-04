@@ -1,5 +1,7 @@
 #include "ObjectsPannel.h"
 
+#include "MyRevoke/Utility/ExecutablePath.h"
+
 #include "imgui.h"
 
 #include <glm/gtc/type_ptr.hpp>
@@ -244,7 +246,8 @@ namespace Revoke
 							if (Utils::IsPayloadTexture(path))
 							{
 								s_TempData.CurrentTextureName = texturePath.stem().string();
-								spriteComponent.Texture2D = texturePath.string();
+								// Scenes keep content paths relative to the editor folder so they survive being moved
+								spriteComponent.Texture2D = std::filesystem::relative(texturePath, GetExecutableDirectory()).string();
 							}
 							else
 							{
@@ -277,7 +280,7 @@ namespace Revoke
 							if (Utils::IsPayloadAudio(path))
 							{
 								s_TempData.CurrentSoundName = soundPath.stem().string();
-								soundComponent.SetPath(soundPath.string());
+								soundComponent.SetPath(std::filesystem::relative(soundPath, GetExecutableDirectory()).string());
 							}
 							else
 							{

@@ -6,6 +6,7 @@
 #include <mono/metadata/object.h>
 
 #include "ScriptConnector.h"
+#include "MyRevoke/Utility/ExecutablePath.h"
 
 namespace Revoke
 {
@@ -107,7 +108,8 @@ namespace Revoke
 
 		void Init()
 		{
-			mono_set_assemblies_path("mono/lib");
+			std::string assembliesPath = (GetExecutableDirectory() / "mono" / "lib").string();
+			mono_set_assemblies_path(assembliesPath.c_str());
 			
 			MonoDomain* rootDomain = mono_jit_init("RevokeRuntime");
 			if (rootDomain == nullptr)
@@ -119,7 +121,7 @@ namespace Revoke
 			// Store the root domain pointer
 			s_Data.RootDomain = rootDomain;
 
-			LoadAssembly("resourses/scripts/MyRevoke-ScriptCore.dll");
+			LoadAssembly((GetExecutableDirectory() / "resourses" / "scripts" / "MyRevoke-ScriptCore.dll").string());
 
 
 			//Example

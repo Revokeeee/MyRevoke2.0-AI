@@ -152,7 +152,9 @@ workspace "MyRevoke"
         language "C++"
         staticruntime "off"
     
-        targetdir ("bin/" .. outputdir .. "/%{prj.name}")
+        -- The editor finds assets/, resourses/ and mono/ next to its own exe, so it builds into the
+        -- folder that already holds them rather than into bin/.
+        targetdir ("%{prj.name}")
         objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
     
         files

@@ -2,6 +2,8 @@
 #include "Renderer2D.h"
 
 #include "imgui.h"
+
+#include "MyRevoke/Utility/ExecutablePath.h"
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp" 
 #include <glm/gtc/type_ptr.hpp> 
@@ -66,7 +68,7 @@ namespace Revoke
 			samplers[i] = i;
 		}
 
-		s_Data->Shader = std::make_shared<Shader>("assets/Shaders/Main.shader");
+		s_Data->Shader = std::make_shared<Shader>((GetExecutableDirectory() / "assets" / "Shaders" / "Main.shader").string());
 		s_Data->Shader->Bind();
 		s_Data->Shader->SetUniformIntArr("u_Textures", samplers, s_Data->MaxTextures);
 
@@ -233,7 +235,7 @@ namespace Revoke
 		if (!sprite.Texture2D.empty())
 		{
 			Shared<Texture> texture;
-			texture = std::make_shared<Texture>(sprite.Texture2D);
+			texture = std::make_shared<Texture>((GetExecutableDirectory() / sprite.Texture2D).string());
 			DrawQuad(transform, texture, entityID);
 		}
 		else

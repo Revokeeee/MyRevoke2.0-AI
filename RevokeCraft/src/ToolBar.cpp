@@ -1,6 +1,7 @@
 #include "rvpch.h"
 
 #include "ToolBar.h"
+#include "MyRevoke/Utility/ExecutablePath.h"
 #include <imgui.h>
 
 #include <ImGuizmo.h>
@@ -9,8 +10,9 @@ namespace Revoke
 {
 	ToolBar::ToolBar()
 	{
-		m_PlayIcon = std::make_shared<Texture>("resourses/icons/Toolbar/Play_Icon.png");
-		m_StopIcon = std::make_shared<Texture>("resourses/icons/Toolbar/Stop_Icon.png");
+		std::filesystem::path iconsDirectory = GetExecutableDirectory() / "resourses" / "icons" / "Toolbar";
+		m_PlayIcon = std::make_shared<Texture>((iconsDirectory / "Play_Icon.png").string());
+		m_StopIcon = std::make_shared<Texture>((iconsDirectory / "Stop_Icon.png").string());
 	}
 	void ToolBar::OnImGuiRender()
 	{

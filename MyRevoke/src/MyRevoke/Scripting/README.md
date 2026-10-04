@@ -12,7 +12,7 @@ path.
   `OnDestroy()` (all empty by default). Helper templates `GetComponent<T>()`/`HasComponent<T>()`
   proxy to an underlying `Entity`, set by `Scene` (a `friend class`).
 - **`NativeScript.h`/`.cpp`** — `Revoke::ScriptEngine`, the loader. `InitDll()` locates and loads
-  `resourses/scripts/Native/MyRevoke-NativeScriptCore.dll`; `OnUpdate()` polls the DLL's last-write
+  `resourses/scripts/Native/MyRevoke-NativeScriptCore.dll` next to the executable; `OnUpdate()` polls the DLL's last-write
   time each frame and hot-reloads it via `OnDllUpdate()`; `GetScritpByName(name)` calls
   `GetProcAddress` for an exported factory function (e.g. `Player`) and invokes it to construct a
   `ScriptEntity*`.

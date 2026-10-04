@@ -1,19 +1,21 @@
 #include "rvpch.h"
 #include "ContentBrowser.h"
+#include "MyRevoke/Utility/ExecutablePath.h"
 
 #include <imgui.h>
 
 
 namespace Revoke
 {
-	const std::filesystem::path g_AssetsDirectory = "assets";
+	extern const std::filesystem::path g_AssetsDirectory;
 
 	ContentBrowser::ContentBrowser()
 		:m_CurrendDir(g_AssetsDirectory)
 	{
 
-		m_FolderIcon = std::make_shared<Texture>("resourses/icons/ContentBrowser/Folder_Icon.png");
-		m_FileIcon = std::make_shared<Texture>("resourses/icons/ContentBrowser/File_Icon.png");
+		std::filesystem::path iconsDirectory = GetExecutableDirectory() / "resourses" / "icons" / "ContentBrowser";
+		m_FolderIcon = std::make_shared<Texture>((iconsDirectory / "Folder_Icon.png").string());
+		m_FileIcon = std::make_shared<Texture>((iconsDirectory / "File_Icon.png").string());
 	}
 
 	void ContentBrowser::OnImGuiRender()
