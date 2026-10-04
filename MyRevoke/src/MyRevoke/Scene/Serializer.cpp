@@ -233,7 +233,7 @@ namespace Revoke
         :m_Scene(scene)
     {
     }
-    void Serializer::Serealize(const std::string& path)
+    std::string Serializer::SerializeToString()
     {
         YAML::Emitter out;
         out << YAML::BeginMap;
@@ -250,18 +250,19 @@ namespace Revoke
         out << YAML::EndSeq;
         out << YAML::EndMap;
 
+        return out.c_str();
+    }
+
+    void Serializer::Serealize(const std::string& path)
+    {
         std::ofstream fout(path);
-        fout << out.c_str();
+        fout << SerializeToString();
     }
 
 
-    bool Serializer::DeSerealize(const std::string& path)
+    bool Serializer::DeserializeFromString(const std::string& yamlSource)
     {
-		std::ifstream stream(path);
-		std::stringstream strStream;
-		strStream << stream.rdbuf();
-
-		YAML::Node data = YAML::Load(strStream.str());
+		YAML::Node data = YAML::Load(yamlSource);
 		if (!data["Scene"])
 			return false;
 
@@ -374,5 +375,13 @@ namespace Revoke
 
     }
 
+    bool Serializer::DeSerealize(const std::string& path)
+    {
+		std::ifstream stream(path);
+		std::stringstream strStream;
+		strStream << stream.rdbuf();
+
+		return DeserializeFromString(strStream.str());
+    }
 
 }
