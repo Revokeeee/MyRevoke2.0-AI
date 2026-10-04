@@ -7,7 +7,7 @@ draw-call API, a 2D batch renderer, and the camera types that feed it view/proje
 
 - **`BuffersAPI.h`/`.cpp`** — `BufferLayout`/`BufferElement` describe vertex attribute layout;
   `VertexBuffer`, `IndexBuffer`, `VertexArray` wrap `glCreateBuffers`/`glCreateVertexArrays`.
-- **`Cmaera.h`** *(sic — "Camera")* — base `Camera` class, holds only a projection matrix.
+- **`Camera.h`** — base `Camera` class, holds only a projection matrix.
 - **`EditorCamera.h`/`.cpp`** — arcball-style camera used by the RevokeCraft viewport: orbits a focal
   point via pitch/yaw/distance, with mouse-driven pan/rotate/zoom.
 - **`FrameBuffers.h`/`.cpp`** — FBO wrapper with configurable color/depth attachments (including a
@@ -46,7 +46,7 @@ So: `Renderer2D::DrawQuad` → CPU vertex buffer → `Renderer2D::End` → `Shad
 
 ## Known issues
 
-- File/class names carry a few typos: `Cmaera.h` ("Camera"), `GraphicContex.h`/`RenderContex`
+- File/class names carry a few typos: `GraphicContex.h`/`RenderContex`
   ("GraphicsContext"/"RenderContext"), `Shader::ProcesShader` ("ProcessShader").
 - `FrameBuffers.cpp`'s `ToGLTextureFormat` has no `default`/fallback branch — falls off the end
   without returning for `None`/`Depth`.

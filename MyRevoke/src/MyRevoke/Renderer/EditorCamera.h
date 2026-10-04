@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "MyRevoke/Renderer/Cmaera.h"
+#include "MyRevoke/Renderer/Camera.h"
 #include "MyRevoke/Core/Time.h"
 #include "MyRevoke/EventSystem/Event.h"
 #include "MyRevoke/EventSystem/MouseEvent.h"

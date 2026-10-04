@@ -3,7 +3,7 @@
 #include "RendererAPI.h"
 
 #include "Shader.h"
-#include "Cmaera.h"
+#include "Camera.h"
 #include "Texture.h"
 #include "EditorCamera.h"
 #include "MyRevoke/Scene/Components.h"

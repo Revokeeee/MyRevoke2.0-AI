@@ -117,10 +117,10 @@ namespace Revoke
 		b2Body* Body = nullptr;
 	};
 
-	struct BoxColisionComponent
+	struct BoxCollisionComponent
 	{
-		BoxColisionComponent() = default;
-		BoxColisionComponent(const BoxColisionComponent&) = default;
+		BoxCollisionComponent() = default;
+		BoxCollisionComponent(const BoxCollisionComponent&) = default;
 
 		glm::vec2 Size = { 0.5f, 0.5f };
 		glm::vec2 Offset = { 0.0f, 0.0f };

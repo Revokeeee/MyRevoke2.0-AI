@@ -1,5 +1,5 @@
 #pragma once
-#include "MyRevoke/Renderer/Cmaera.h"
+#include "MyRevoke/Renderer/Camera.h"
 
 namespace Revoke {
 

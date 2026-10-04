@@ -13,7 +13,7 @@ Entities:
     RigidBodyComponent:
       BodyType: 0
       IsRotating: true
-    BoxColisionComponent:
+    BoxCollisionComponent:
       Offset: [0, 0]
       Size: [0.5, 0.5]
       Density: 1
@@ -36,7 +36,7 @@ Entities:
     RigidBodyComponent:
       BodyType: 0
       IsRotating: true
-    BoxColisionComponent:
+    BoxCollisionComponent:
       Offset: [0, 0]
       Size: [0.5, 0.5]
       Density: 1
@@ -57,7 +57,7 @@ Entities:
     RigidBodyComponent:
       BodyType: 0
       IsRotating: true
-    BoxColisionComponent:
+    BoxCollisionComponent:
       Offset: [0, 0]
       Size: [0.5, 0.5]
       Density: 1
@@ -78,7 +78,7 @@ Entities:
     RigidBodyComponent:
       BodyType: 0
       IsRotating: true
-    BoxColisionComponent:
+    BoxCollisionComponent:
       Offset: [0, 0]
       Size: [0.5, 0.5]
       Density: 1
@@ -99,7 +99,7 @@ Entities:
     RigidBodyComponent:
       BodyType: 0
       IsRotating: true
-    BoxColisionComponent:
+    BoxCollisionComponent:
       Offset: [0, 0]
       Size: [0.5, 0.5]
       Density: 1
@@ -120,7 +120,7 @@ Entities:
     RigidBodyComponent:
       BodyType: 2
       IsRotating: true
-    BoxColisionComponent:
+    BoxCollisionComponent:
       Offset: [0, 0]
       Size: [0.5, 0.5]
       Density: 1
@@ -143,7 +143,7 @@ Entities:
     RigidBodyComponent:
       BodyType: 0
       IsRotating: true
-    BoxColisionComponent:
+    BoxCollisionComponent:
       Offset: [0, 0]
       Size: [0.5, 0.5]
       Density: 1
@@ -164,7 +164,7 @@ Entities:
     RigidBodyComponent:
       BodyType: 0
       IsRotating: true
-    BoxColisionComponent:
+    BoxCollisionComponent:
       Offset: [0, 0]
       Size: [0.5, 0.5]
       Density: 1
@@ -185,7 +185,7 @@ Entities:
     RigidBodyComponent:
       BodyType: 0
       IsRotating: true
-    BoxColisionComponent:
+    BoxCollisionComponent:
       Offset: [0, 0]
       Size: [0.5, 0.5]
       Density: 1
