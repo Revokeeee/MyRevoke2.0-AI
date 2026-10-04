@@ -136,18 +136,16 @@ jobs:
                `.github/pull_request_template.md` yourself and write the body
                following that structure - it is the source of truth, use
                whatever sections it currently has rather than a remembered
-               version. Fill it in properly:
-               - Summary: what changed and why, linking the originating issue
-               - Checklist: tick honestly. There is no test suite yet, so for
-                 tests say how you actually verified the change instead.
-                 Tick "needs close human review" when the change involves a
-                 structural decision or anything you are unsure about.
-               - Notes for AI review: tell the automated reviewer what to
-                 focus on or skip for this specific change
-               - Notes for human review: anything needing a human judgment
-                 call - tradeoffs, scope questions, follow-up work that
-                 should become its own issue, partial fixes
-               Leave a section empty rather than padding it with filler.
+               version. Keep it short: read `.github/WRITING_STYLE.md` first
+               and follow its limits (the whole body under 150 words).
+               - Summary: what changed and why, 3 sentences max, link the issue
+               - Checklist: tick honestly. For tests, one line on how you
+                 verified it. Tick "needs close human review" if the change
+                 involves a structural decision or anything you are unsure of.
+               - Notes for AI review / human review: 3 bullets max each, only
+                 what the reader must know or decide. Write "None." otherwise.
+               Don't explain how the code works (the diff does), and don't
+               defend your choices against the reviewer in advance.
 
             **New issue(s) requested** - e.g. "create an issue for X", often
             said in a comment on some other issue or PR. Create them directly
@@ -178,6 +176,10 @@ jobs:
             renumber the later ones (`gh issue edit <n> --title ...`) if it
             has to come earlier. An issue shared by two parents keeps the
             same number in both lists.
+
+            Keep issue bodies short, per `.github/WRITING_STYLE.md`: a
+            3-sentence context, a few bullets of what to do, a few checkable
+            acceptance criteria, under 200 words.
 
             Creating the issue(s) is the whole task - do not also write code
             or open a PR for it. Only create issues when actually asked to; never spawn
