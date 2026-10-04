@@ -132,7 +132,10 @@ jobs:
             `gh pr review ${{ steps.find-pr.outputs.pr_number }} --comment --body "..."`
             (use `--request-changes` instead of `--comment` if you find real
             issues, or `--approve` if the PR genuinely looks correct as-is).
-            Be specific: file, line, what's wrong, why it matters.
+            Keep it short, per `.github/WRITING_STYLE.md`: one bullet per
+            finding - `file:line`, the problem, the fix. No intro, no closing
+            summary, no praise. If there is nothing to flag, post one line
+            saying so.
 
       - name: Claude Code Auto-fix + escalate if needed
         if: steps.find-pr.outputs.found == 'true'
@@ -166,12 +169,10 @@ jobs:
             `gh pr comment ${{ steps.find-pr.outputs.pr_number }} --body "..."`
             titled `Fixes applied:`, listing each fix as one line:
             `- <file>:<line> - <what was wrong> -> <what you changed>`.
-            If you looked at a finding and deliberately left it alone, list
-            that too, under a `Left as-is:` heading, with why. This is the
-            human's record of what changed and why - specific enough that
-            they can judge each fix on its own and `git revert` the commit if
-            they disagree with how something was handled, without re-deriving
-            it from the diff. Skip this entirely if you made no changes at all.
+            A finding you deliberately left alone goes under `Left as-is:`,
+            with a few words on why. Keep each line short but specific enough
+            to judge the fix without opening the diff. Skip this entirely if
+            you made no changes.
 
             ## Never merge
 
@@ -196,11 +197,10 @@ jobs:
 
             To escalate, use
             `gh pr comment ${{ steps.find-pr.outputs.pr_number }} --body "..."`
-            with a comment starting `NEEDS DECISION:` followed by 2-4 plain,
-            technical sentences: what the concern is, why it needs a human
-            call, and a concrete suggestion if you have one. No preamble, no
-            restating the whole PR - assume the reader will open the diff
-            themselves.
+            with a comment starting `NEEDS DECISION:` followed by 2-3 short
+            technical sentences: the concern, why it needs a human call, and
+            a concrete suggestion if you have one. No preamble, no restating
+            the PR - the reader will open the diff.
 
             If none of those apply, post nothing here - the review you already
             left is enough, and a redundant "looks good" comment is noise.

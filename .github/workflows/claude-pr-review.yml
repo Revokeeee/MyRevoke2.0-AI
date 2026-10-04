@@ -75,7 +75,9 @@ jobs:
             - Performance: Allocations in tight loops? O(n²) where it shouldn't be?
             - Style: Matches the codebase patterns (naming, error handling, smart pointers)?
 
-            Be specific: line numbers, what the bug is, why it matters, how to fix it.
+            Keep it short, per `.github/WRITING_STYLE.md`: one bullet per
+            finding - `file:line`, the problem, the fix. No intro, no closing
+            summary, no praise.
 
             Post the review with exactly one
             `gh pr review ${{ github.event.pull_request.number }} --comment --body-file <file>`
