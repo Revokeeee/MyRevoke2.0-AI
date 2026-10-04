@@ -1,6 +1,8 @@
 #include "rvpch.h"
 #include "NativeScript.h"
 
+#include "MyRevoke/Utility/ExecutablePath.h"
+
 
 
 namespace Revoke
@@ -9,7 +11,6 @@ namespace Revoke
 	{
 		DLLdata	Dll;
 
-		char ExePath[MAX_PATH];
 		char DllPath[MAX_PATH];
 
 		FILETIME DllLastWriteTime;
@@ -425,11 +426,16 @@ namespace Revoke
 			//AttachVS();
 		}
 
-		GetModuleFileNameA(NULL, s_Data.ExePath, MAX_PATH);
-		const char* dllPath = "resourses/scripts/Native/MyRevoke-NativeScriptCore.dll";
-		const char* loadDllPath = dllPath;
+		std::string dllPath = (GetExecutableDirectory() / "resourses" / "scripts" / "Native" / "MyRevoke-NativeScriptCore.dll").string();
+		if (dllPath.size() >= MAX_PATH)
+		{
+			RV_ENGINE_ERROR("Script DLL path does not fit in MAX_PATH: {}", dllPath);
+			CoUninitialize();
+			return;
+		}
+		strcpy(s_Data.DllPath, dllPath.c_str());
 
-		strcpy(s_Data.DllPath, dllPath);
+		const char* loadDllPath = s_Data.DllPath;
 		// create a copy of DLL and PDB
 
 		s_Data.Ok = patchDLL(s_Data.DllPath, s_Data.PatchedDllPath, s_Data.PatchedPdbPath);

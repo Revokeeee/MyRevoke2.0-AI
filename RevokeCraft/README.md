@@ -27,6 +27,10 @@ the new `Scene` into every panel — there's no observer/event pattern for this.
 
 ## Assets and resources
 
+All of these live next to `RevokeCraft.exe` (the Premake `targetdir` for this project is the
+`RevokeCraft/` folder itself) and are opened through `GetExecutableDirectory()`, so the editor can be
+started from any working directory.
+
 - `assets/Shaders`, `assets/Textures`, `assets/Scenes` (`.myrevoke` serialized scenes),
   `assets/Scripts` (the reference `ScriptExample.h`/`.cpp` native script — see
   [`Scripting/README.md`](../MyRevoke/src/MyRevoke/Scripting/README.md)), `assets/Audio`.
@@ -46,8 +50,5 @@ the new `Scene` into every panel — there's no observer/event pattern for this.
   only and echoes a hardcoded path.
 - `ObjectsPannel.cpp`'s audio drag-drop payload check compares against extension `L".wov"`, almost
   certainly meant to be `.wav`.
-- `ContentBrowser.cpp` and `CraftLayer.cpp` each independently declare
-  `const std::filesystem::path g_AssetsDirectory = "assets"` at namespace scope; only one is `extern`,
-  so this is duplicate global state that happens to work today.
 - `CraftLayer.cpp` has a `// TODO: Fix the picking in a play mode!!!` — mouse picking is known-broken
   during Runtime scene state.

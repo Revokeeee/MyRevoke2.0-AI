@@ -4,6 +4,11 @@ A grab-bag of small, unrelated platform helpers.
 
 ## Files
 
+- **`ExecutablePath.h`/`.cpp`** — `GetExecutableDirectory()`, which returns the folder holding the
+  running `.exe` (Win32 `GetModuleFileNameW`, read once and cached in a function-local static). Every
+  path to a shipped resource — the renderer shader, editor icons, the Mono runtime, the native script
+  DLL, the editor's `assets` folder — is built from it, so the engine no longer depends on the process
+  being started with a particular working directory.
 - **`FileExplorer.h`/`.cpp`** — `FileExplorer::OpenFile(filter)`/`SaveFile(filter)`, static methods
   wrapping the Win32 `GetOpenFileNameA`/`GetSaveFileNameA` common dialogs (via
   `GLFW_EXPOSE_NATIVE_WIN32`/`glfwGetWin32Window`). Used by the editor
@@ -13,8 +18,9 @@ A grab-bag of small, unrelated platform helpers.
 
 ## Known issues
 
-- `FileExplorer` is hardcoded to Win32 (`commdlg.h`, no `#ifdef` guard) — won't compile on other
-  platforms, unlike the rest of the engine's GLFW/GLAD-based cross-platform intent.
+- `FileExplorer` and `ExecutablePath` are hardcoded to Win32 (`commdlg.h`/`GetModuleFileNameW`, no
+  `#ifdef` guard) — won't compile on other platforms, unlike the rest of the engine's GLFW/GLAD-based
+  cross-platform intent.
 - `OpenFile` and `SaveFile` duplicate almost identical `OPENFILENAMEA` setup code; both also pass
   `OFN_FILEMUSTEXIST`, which is an odd flag for a *save* dialog (limits "Save As" to overwriting
   existing files only) and looks like a copy-paste bug.

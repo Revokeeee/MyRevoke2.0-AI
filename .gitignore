@@ -340,6 +340,13 @@ __pycache__/
 OpenCover/
 
 # Custom ignore rules
+
+# RevokeCraft builds into its own folder, next to the assets it loads at runtime
+/RevokeCraft/RevokeCraft.exe
+/RevokeCraft/RevokeCraft.exp
+/RevokeCraft/RevokeCraft.lib
+/RevokeCraft/RevokeCraft.ilk
+
 !MyRevoke/vendor/OpenALBuild/**
 !MyRevoke/vendor/libsndfile/**
 !MyRevoke/vendor/mono/**
