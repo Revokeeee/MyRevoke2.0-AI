@@ -8,7 +8,9 @@ body:
       value: |
         Start the title with an area tag in square brackets, like `[Scripting]` or `[UI]`.
         A tag names an engine area or feature, not a kind of work. Reuse a tag that's
-        already in use where one fits.
+        already in use where one fits. If this issue is part of a sequence, add its order of
+        execution as a last bracket with just a number (`[Scripting][3]`, 1 = first). Parent and
+        standalone issues get no number.
   - type: textarea
     id: what-happens
     attributes:
