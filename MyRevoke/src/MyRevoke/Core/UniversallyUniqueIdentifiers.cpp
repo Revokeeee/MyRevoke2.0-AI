@@ -1,19 +1,16 @@
 #include "rvpch.h"
 #include "UniversallyUniqueIdentifiers.h"
 
-#include <random>
-
-
+#include "MyRevoke/Core/UuidGenerator.h"
 
 namespace Revoke
 {
-	static std::random_device s_RD;
-	static std::mt19937_64 s_Engine(s_RD());
-	static std::uniform_int_distribution<uint64_t> s_Distribution;
-
 	UUID::UUID()
 	{
-		m_UUID = s_Distribution(s_Engine);
+		// All default-constructed UUIDs share one generator so the engine draws
+		// from a single random sequence rather than reseeding per entity.
+		static UuidGenerator s_DefaultGenerator;
+		m_UUID = s_DefaultGenerator.Generate();
 	}
 	UUID::UUID(uint64_t uuid)
 	{
