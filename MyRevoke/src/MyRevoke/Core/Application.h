@@ -33,7 +33,10 @@ namespace Revoke
 		void PushLayer(Layer* layer);
 		void PushOverlay(Layer* layer);
 
+		// Quits immediately.
 		void Close();
+		// Quits unless a layer vetoes it through Layer::OnCloseRequested().
+		void RequestClose();
 
 		ImGuiLayer* GetImGuiLayer() { return m_ImGuiLayer; }
 

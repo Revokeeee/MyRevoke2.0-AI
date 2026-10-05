@@ -29,6 +29,7 @@ namespace Revoke
 		void OnUpdate(Timestep deltaTime) override;
 		void OnImGuiDraw() override;
 		void OnEvent(Event& e) override;
+		bool OnCloseRequested() override;
 
 		bool OnMouseBtnPressed(MouseButtonPressedEvent& e);
 		bool OnKeyPressed(KeyPressedEvent& e);
@@ -40,12 +41,19 @@ namespace Revoke
 		void NewScene();
 		void OpenScene();
 		void OpenScene(const std::filesystem::path& path);
-		void SaveAs();
-		void Save();
+		// Both return false when nothing was saved (no project, or the dialog was cancelled).
+		bool SaveAs();
+		bool Save();
 
 		Shared<Scene> GetCurrentScene() const { return m_Scene; }
 
 	private:
+		std::string SerializeScene();
+		void MarkSceneSaved();
+		bool HasUnsavedChanges();
+		bool SaveBeforeClosing();
+		void DrawSavePrompt();
+
 		void SetProject(Shared<Project> project);
 		std::filesystem::path GetAssetsDirectory() const;
 
@@ -53,6 +61,11 @@ namespace Revoke
 
 		Shared<Scene> m_Scene;
 		Shared<Project> m_Project;
+
+		// The scene as last saved, opened or created, to tell whether it has unsaved changes.
+		std::string m_SavedSceneState;
+		std::filesystem::path m_ScenePath;
+		bool m_ShowSavePrompt = false;
 
 		Entity m_CameraEntity;
 		Entity m_SecondCamera;

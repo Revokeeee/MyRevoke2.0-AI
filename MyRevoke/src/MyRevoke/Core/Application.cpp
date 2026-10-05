@@ -70,6 +70,15 @@ namespace Revoke
 	{
 		m_Run = false;
 	}
+	void Application::RequestClose()
+	{
+		for (Layer* layer : m_LayerStack)
+		{
+			if (!layer->OnCloseRequested())
+				return;
+		}
+		m_Run = false;
+	}
 	void Application::OnEvent(Event& e)
 	{
 		
@@ -98,7 +107,11 @@ namespace Revoke
 	}
 	bool Application::OnWindowClose(WindowsCloseEvent e)
 	{
-		m_Run = false;
+		RequestClose();
+
+		// GLFW has already flagged the window to close by the time this event arrives.
+		if (m_Run)
+			glfwSetWindowShouldClose((GLFWwindow*)m_Window->GetCoreWindow(), GLFW_FALSE);
 		return true;
 	}
 	bool Application::OnWindowResize(WindowResizeEvent e)

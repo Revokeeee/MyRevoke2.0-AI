@@ -66,6 +66,7 @@ namespace Revoke
 		RendererAPI::EnableBlending();
 
 		OpenProject(GetExecutableDirectory() / "projects" / "Example" / "Example.mrproject");
+		MarkSceneSaved();
 	}
 	void CraftLayer::OnDetach()
 	{
@@ -171,7 +172,7 @@ namespace Revoke
 		{
 			if (ImGui::BeginMenu("File"))
 			{
-				if (ImGui::MenuItem("Exit")) Application::Get().Close();
+				if (ImGui::MenuItem("Exit")) Application::Get().RequestClose();
 				if (ImGui::MenuItem("New Project")) NewProject();
 				if (ImGui::MenuItem("Open Project")) OpenProject();
 				if (ImGui::MenuItem("New Scene", "Ctrl+N")) NewScene();
@@ -185,6 +186,8 @@ namespace Revoke
 
 			ImGui::EndMenuBar();
 		}
+
+		DrawSavePrompt();
 
 		//-----------Settings-------------------------------------------------
 	
@@ -411,6 +414,9 @@ namespace Revoke
 		m_ObjPannel.SetScene(m_Scene);
 		m_ToolBar.SetScene(m_Scene);
 		m_ProjectSettingsPanel.SetScene(m_Scene);
+
+		m_ScenePath.clear();
+		MarkSceneSaved();
 	}
 
 	void CraftLayer::OpenScene()
@@ -433,38 +439,122 @@ namespace Revoke
 		m_Scene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
 		
 		Serializer sceneSerializer(m_Scene, GetAssetsDirectory());
- 		sceneSerializer.DeSerealize(path.string());
+ 		bool loaded = sceneSerializer.DeSerealize(path.string());
 
 		m_ObjPannel.SetScene(m_Scene);
 		m_ToolBar.SetScene(m_Scene);
 		m_ProjectSettingsPanel.SetScene(m_Scene);
-		
+
+		m_ScenePath = loaded ? path : std::filesystem::path();
+		MarkSceneSaved();
 	}
 
-	void CraftLayer::SaveAs()
+	bool CraftLayer::SaveAs()
 	{
 		std::string path = FileExplorer::SaveFile("MyRevoke Scene (*.myrevoke)\0*.myrevoke\0");
 
-		if (!path.empty())
-		{
-			Serializer sceneSerializer(m_Scene, GetAssetsDirectory());
-			sceneSerializer.Serealize(path+".myrevoke");
-		}
+		if (path.empty())
+			return false;
+
+		Serializer sceneSerializer(m_Scene, GetAssetsDirectory());
+		sceneSerializer.Serealize(path+".myrevoke");
+
+		m_ScenePath = path + ".myrevoke";
+		MarkSceneSaved();
+		return true;
 	}
 
-	void CraftLayer::Save()
+	bool CraftLayer::Save()
 	{
 		if (!m_Project)
 		{
 			RV_EDITOR_ERROR("No project open - use Save as to pick a file");
-			return;
+			return false;
 		}
 
 		std::filesystem::path scenesDirectory = m_Project->GetScenesDirectory();
 		std::filesystem::create_directories(scenesDirectory);
 
+		std::filesystem::path file = scenesDirectory / (m_Scene->GetName() + ".myrevoke");
 		Serializer sceneSerializer(m_Scene, GetAssetsDirectory());
-		sceneSerializer.Serealize((scenesDirectory / (m_Scene->GetName() + ".myrevoke")).string());
+		sceneSerializer.Serealize(file.string());
+
+		m_ScenePath = file;
+		MarkSceneSaved();
+		return true;
+	}
+
+	std::string CraftLayer::SerializeScene()
+	{
+		Serializer sceneSerializer(m_Scene, GetAssetsDirectory());
+		return sceneSerializer.SerializeToString();
+	}
+
+	void CraftLayer::MarkSceneSaved()
+	{
+		m_SavedSceneState = SerializeScene();
+	}
+
+	bool CraftLayer::HasUnsavedChanges()
+	{
+		return SerializeScene() != m_SavedSceneState;
+	}
+
+	// A scene that was never saved asks where to go (Save() would pick a path silently, and could
+	// overwrite a file that happens to share the scene's name).
+	bool CraftLayer::SaveBeforeClosing()
+	{
+		if (m_ScenePath.empty())
+			return SaveAs();
+
+		Serializer sceneSerializer(m_Scene, GetAssetsDirectory());
+		sceneSerializer.Serealize(m_ScenePath.string());
+		MarkSceneSaved();
+		return true;
+	}
+
+	bool CraftLayer::OnCloseRequested()
+	{
+		if (!HasUnsavedChanges())
+			return true;
+
+		m_ShowSavePrompt = true;
+		return false;
+	}
+
+	void CraftLayer::DrawSavePrompt()
+	{
+		if (m_ShowSavePrompt)
+		{
+			ImGui::OpenPopup("Save changes?");
+			m_ShowSavePrompt = false;
+		}
+
+		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+		if (!ImGui::BeginPopupModal("Save changes?", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+			return;
+
+		ImGui::Text("Save changes to \"%s\" before closing?", m_Scene->GetName().c_str());
+		ImGui::Spacing();
+
+		if (ImGui::Button("Save"))
+		{
+			// A cancelled Save As dialog keeps the editor open, same as Cancel.
+			if (SaveBeforeClosing())
+				Application::Get().Close();
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Don't Save"))
+		{
+			Application::Get().Close();
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel"))
+			ImGui::CloseCurrentPopup();
+
+		ImGui::EndPopup();
 	}
 
 }
