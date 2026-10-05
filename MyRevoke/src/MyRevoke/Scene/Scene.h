@@ -2,6 +2,8 @@
 
 #include "entt.hpp"
 
+#include <filesystem>
+
 #include "MyRevoke/Core/Time.h"
 #include "MyRevoke/Renderer/EditorCamera.h"
 #include "MyRevoke/Core/UniversallyUniqueIdentifiers.h"
@@ -21,9 +23,16 @@ namespace Revoke
 			Scene();
 			Scene(std::string name);
 			~Scene();
+
+			// Builds an independent scene with the same entities by saving the source to text and
+			// loading it back. Play mode runs on such a copy so the edited scene is never touched.
+			static Shared<Scene> Copy(const Shared<Scene>& source, const std::filesystem::path& assetsDirectory = {});
 			
 			Entity CreateEntity(const std::string name = std::string());
 			Entity CreateEntity(UUID id, const std::string name = std::string());
+
+			// Returns an empty Entity when no entity has this id.
+			Entity FindEntityByUUID(UUID id);
 
 			void OnRuntimeStart();
 
@@ -42,6 +51,8 @@ namespace Revoke
 			void SetGravityStats(int positionIteration, int velocityIteration) { SetGravityPositionIteration(positionIteration); SetGravityVelocityIteration(velocityIteration); }
 			void SetGravityPositionIteration(int positionIteration) { m_PositionIteration = positionIteration; }
 			void SetGravityVelocityIteration(int velocityIteration) { m_VelocityIteration = velocityIteration; }
+			int GetGravityPositionIteration() const { return m_PositionIteration; }
+			int GetGravityVelocityIteration() const { return m_VelocityIteration; }
 
 			void OnSceneClose();
 
