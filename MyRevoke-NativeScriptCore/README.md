@@ -6,10 +6,11 @@ runtime by the engine's [native scripting system](../MyRevoke/src/MyRevoke/Scrip
 output straight into `RevokeCraft/resourses/scripts/Native`, which is why RevokeCraft can rebuild and
 hot-swap it ("Build Scripts" in `SceneSettingsPannel`) without restarting.
 
-The build includes both `src/**` (this project) and `RevokeCraft/assets/Scripts/**` (see the
-`premake5.lua` `files` block for this project) — so the actual gameplay scripts, like
-`RevokeCraft/assets/Scripts/ScriptExample.h`/`.cpp`, are compiled as part of this DLL, not the engine
-or editor.
+The build includes both `src/**` (this project) and the example project's
+`RevokeCraft/projects/Example/assets/Scripts/**` (see the `premake5.lua` `files` block for this
+project) — so the actual gameplay scripts, like `ScriptExample.h`/`.cpp`, are compiled as part of
+this DLL, not the engine or editor. The scripts folder is hardcoded to the example project; other
+projects cannot have their scripts compiled yet.
 
 ## Files
 

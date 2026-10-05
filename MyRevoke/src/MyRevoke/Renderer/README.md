@@ -30,7 +30,7 @@ it has no view/position logic of its own (that comes from the entity's `Transfor
 ## Draw-call flow
 
 `Renderer2D::Init` builds one shared quad `VertexArray` + dynamic `VertexBuffer`/`IndexBuffer` and
-loads `assets/Shaders/Main.shader` from next to the executable (`GetExecutableDirectory()`, see
+loads `resourses/shaders/Main.shader` from next to the executable (`GetExecutableDirectory()`, see
 [`Utility/README.md`](../Utility/README.md)). From there, per frame:
 
 1. `Begin(camera)` binds the shader, uploads the view-projection matrix, resets the CPU-side vertex

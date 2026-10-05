@@ -9,7 +9,7 @@ Entities:
       Scale: [1, 1, 1]
     SpriteRendererComponent:
       Color: [1, 1, 1, 1]
-      Texture2D: assets\Textures\Triangle_Texture.png
+      Texture2D: Textures\Triangle_Texture.png
     RigidBodyComponent:
       BodyType: 0
       IsRotating: true
@@ -32,7 +32,7 @@ Entities:
       Scale: [1, 4.33374977, 1]
     SpriteRendererComponent:
       Color: [1, 1, 1, 1]
-      Texture2D: assets\Textures\block.png
+      Texture2D: Textures\block.png
     RigidBodyComponent:
       BodyType: 0
       IsRotating: true
@@ -53,7 +53,7 @@ Entities:
       Scale: [1, 2.38494587, 1]
     SpriteRendererComponent:
       Color: [1, 1, 1, 1]
-      Texture2D: assets\Textures\block.png
+      Texture2D: Textures\block.png
     RigidBodyComponent:
       BodyType: 0
       IsRotating: true
@@ -74,7 +74,7 @@ Entities:
       Scale: [1, 1, 1]
     SpriteRendererComponent:
       Color: [1, 1, 1, 1]
-      Texture2D: assets\Textures\block.png
+      Texture2D: Textures\block.png
     RigidBodyComponent:
       BodyType: 0
       IsRotating: true
@@ -95,7 +95,7 @@ Entities:
       Scale: [1, 1, 1]
     SpriteRendererComponent:
       Color: [1, 1, 1, 1]
-      Texture2D: assets\Textures\Triangle_Texture.png
+      Texture2D: Textures\Triangle_Texture.png
     RigidBodyComponent:
       BodyType: 0
       IsRotating: true
@@ -116,7 +116,7 @@ Entities:
       Scale: [1, 1, 1]
     SpriteRendererComponent:
       Color: [1, 1, 1, 1]
-      Texture2D: assets\Textures\Player.png
+      Texture2D: Textures\Player.png
     RigidBodyComponent:
       BodyType: 2
       IsRotating: true
@@ -139,7 +139,7 @@ Entities:
       Scale: [100.184013, 14.9426413, 1]
     SpriteRendererComponent:
       Color: [0.156862736, 0.138408303, 0.138408303, 1]
-      Texture2D: assets\Textures\floor.png
+      Texture2D: Textures\floor.png
     RigidBodyComponent:
       BodyType: 0
       IsRotating: true
@@ -160,7 +160,7 @@ Entities:
       Scale: [1.42412627, 12.7607069, 2.55999994]
     SpriteRendererComponent:
       Color: [0.818627477, 0.678176701, 0.678176701, 1]
-      Texture2D: assets\Textures\floor.png
+      Texture2D: Textures\floor.png
     RigidBodyComponent:
       BodyType: 0
       IsRotating: true
@@ -181,7 +181,7 @@ Entities:
       Scale: [1, 1, 1]
     SpriteRendererComponent:
       Color: [1, 1, 1, 1]
-      Texture2D: assets\Textures\Triangle_Texture.png
+      Texture2D: Textures\Triangle_Texture.png
     RigidBodyComponent:
       BodyType: 0
       IsRotating: true

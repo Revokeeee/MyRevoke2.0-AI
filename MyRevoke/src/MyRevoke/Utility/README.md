@@ -7,8 +7,9 @@ A grab-bag of small, unrelated platform helpers.
 - **`ExecutablePath.h`/`.cpp`** — `GetExecutableDirectory()`, which returns the folder holding the
   running `.exe` (Win32 `GetModuleFileNameW`, read once and cached in a function-local static). Every
   path to a shipped resource — the renderer shader, editor icons, the Mono runtime, the native script
-  DLL, the editor's `assets` folder — is built from it, so the engine no longer depends on the process
-  being started with a particular working directory.
+  DLL, the example project — is built from it, so the engine no longer depends on the process being
+  started with a particular working directory. User content paths come from the open
+  [`Project`](../Project/README.md) instead.
 - **`FileExplorer.h`/`.cpp`** — `FileExplorer::OpenFile(filter)`/`SaveFile(filter)`, static methods
   wrapping the Win32 `GetOpenFileNameA`/`GetSaveFileNameA` common dialogs (via
   `GLFW_EXPOSE_NATIVE_WIN32`/`glfwGetWin32Window`). Used by the editor

@@ -1,15 +1,11 @@
 #include "ObjectsPannel.h"
 
-#include "MyRevoke/Utility/ExecutablePath.h"
-
 #include "imgui.h"
 
 #include <glm/gtc/type_ptr.hpp>
 
 namespace Revoke
 {
-
-	extern const std::filesystem::path g_AssetsDirectory;
 
 	struct TempData
 	{
@@ -241,13 +237,12 @@ namespace Revoke
 						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_PAYLOAD"))
 						{
 							const wchar_t* path = (const wchar_t*)payload->Data;
-							std::filesystem::path texturePath = std::filesystem::path(g_AssetsDirectory) / path;
+							std::filesystem::path texturePath = m_AssetsDirectory / path;
 
 							if (Utils::IsPayloadTexture(path))
 							{
 								s_TempData.CurrentTextureName = texturePath.stem().string();
-								// Scenes keep content paths relative to the editor folder so they survive being moved
-								spriteComponent.Texture2D = std::filesystem::relative(texturePath, GetExecutableDirectory()).string();
+								spriteComponent.Texture2D = texturePath.string();
 							}
 							else
 							{
@@ -275,12 +270,12 @@ namespace Revoke
 						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_PAYLOAD"))
 						{
 							const wchar_t* path = (const wchar_t*)payload->Data;
-							std::filesystem::path soundPath = std::filesystem::path(g_AssetsDirectory) / path;
+							std::filesystem::path soundPath = m_AssetsDirectory / path;
 
 							if (Utils::IsPayloadAudio(path))
 							{
 								s_TempData.CurrentSoundName = soundPath.stem().string();
-								soundComponent.SetPath(std::filesystem::relative(soundPath, GetExecutableDirectory()).string());
+								soundComponent.SetPath(soundPath.string());
 							}
 							else
 							{

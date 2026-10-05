@@ -16,7 +16,7 @@ single `CraftLayer`, and implements the `Revoke::CreateApplication()` factory re
 |---|---|---|
 | `CraftLayer.h`/`.cpp` | Dockspace, menu bar, viewport, gizmo manipulation | Owns the `Scene`, `EditorCamera`, framebuffer (for mouse picking via `ReadPixel`), and all the other panels; scene file I/O via `Serializer`/`FileExplorer` |
 | `ObjectsPannel.h`/`.cpp` *(sic — "Panel")* | "Scene Hierarchy" + "Properties" | Iterates `Scene`'s registry, per-component property editors, "Add Component" popup |
-| `ContentBrowser.h`/`.cpp` | "Content Browser" | Icon grid over the `assets/` directory tree; drag-and-drop source for textures/audio/scripts |
+| `ContentBrowser.h`/`.cpp` | "Content Browser" | Icon grid over the open project's assets tree; drag-and-drop source for textures/audio/scripts |
 | `SceneSettingsPannel.h`/`.cpp` *(sic)* | "Scene Settings" | Clear color, blending toggle, physics iteration counts, "Build Scripts" (`msbuild` on `MyRevoke-NativeScriptCore`) |
 | `ToolBar.h`/`.cpp` | Play/Stop + gizmo mode (Q/W/E/R) toolbar | `Scene::OnRuntimeStart`/`OnRuntimeStop`, writes into a shared gizmo-type pointer |
 
@@ -25,18 +25,22 @@ shared state (the `Scene`, the gizmo pointer) into them, and `OnImGuiDraw()` cal
 `OnImGuiRender()` in sequence. Whenever the scene changes (new/open), `CraftLayer` manually re-pushes
 the new `Scene` into every panel — there's no observer/event pattern for this.
 
-## Assets and resources
+## Projects, assets and resources
 
-All of these live next to `RevokeCraft.exe` (the Premake `targetdir` for this project is the
+User content lives in a [`Project`](../MyRevoke/src/MyRevoke/Project/README.md) — a `<Name>.mrproject`
+file plus an `assets/` folder — in a folder the user picks ("New Project"/"Open Project" in the File
+menu). `CraftLayer` owns the open project and pushes its assets directory into the content browser and
+the properties panel; scene save/load goes to the project's `assets/Scenes`.
+
+The editor's own files live next to `RevokeCraft.exe` (the Premake `targetdir` for this project is the
 `RevokeCraft/` folder itself) and are opened through `GetExecutableDirectory()`, so the editor can be
 started from any working directory.
 
-- `assets/Shaders`, `assets/Textures`, `assets/Scenes` (`.myrevoke` serialized scenes),
-  `assets/Scripts` (the reference `ScriptExample.h`/`.cpp` native script — see
-  [`Scripting/README.md`](../MyRevoke/src/MyRevoke/Scripting/README.md)), `assets/Audio`.
-- `resourses/` *(sic — "resources")*: `icons/` for the content browser and toolbar, and
-  `scripts/Native` where the compiled `MyRevoke-NativeScriptCore` DLL is hot-loaded from at runtime.
+- `resourses/` *(sic — "resources")*: `shaders/Main.shader` (the engine's renderer shader), `icons/`
+  for the content browser and toolbar, and `scripts/Native` where the compiled
+  `MyRevoke-NativeScriptCore` DLL is hot-loaded from at runtime.
 - `mono/` — the Mono runtime distribution needed for embedded C# scripting.
+- `projects/Example/` — the example project (the old `assets/` content), opened on startup.
 
 ## Known issues
 
@@ -50,5 +54,9 @@ started from any working directory.
   only and echoes a hardcoded path.
 - `ObjectsPannel.cpp`'s audio drag-drop payload check compares against extension `L".wov"`, almost
   certainly meant to be `.wav`.
+- The example project ships inside the editor's own folder, so saving a scene in it writes to the
+  install folder. Only user projects created elsewhere stay out of it.
+- `premake5.lua` compiles native scripts from the example project's `assets/Scripts` only, so scripts
+  in other projects are not built.
 - `CraftLayer.cpp` has a `// TODO: Fix the picking in a play mode!!!` — mouse picking is known-broken
   during Runtime scene state.

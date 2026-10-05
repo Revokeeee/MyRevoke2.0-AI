@@ -68,7 +68,7 @@ namespace Revoke
 			samplers[i] = i;
 		}
 
-		s_Data->Shader = std::make_shared<Shader>((GetExecutableDirectory() / "assets" / "Shaders" / "Main.shader").string());
+		s_Data->Shader = std::make_shared<Shader>((GetExecutableDirectory() / "resourses" / "shaders" / "Main.shader").string());
 		s_Data->Shader->Bind();
 		s_Data->Shader->SetUniformIntArr("u_Textures", samplers, s_Data->MaxTextures);
 
@@ -235,7 +235,7 @@ namespace Revoke
 		if (!sprite.Texture2D.empty())
 		{
 			Shared<Texture> texture;
-			texture = std::make_shared<Texture>((GetExecutableDirectory() / sprite.Texture2D).string());
+			texture = std::make_shared<Texture>(sprite.Texture2D);
 			DrawQuad(transform, texture, entityID);
 		}
 		else

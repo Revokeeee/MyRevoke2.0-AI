@@ -7,22 +7,31 @@
 
 namespace Revoke
 {
-	extern const std::filesystem::path g_AssetsDirectory;
-
 	ContentBrowser::ContentBrowser()
-		:m_CurrendDir(g_AssetsDirectory)
 	{
-
 		std::filesystem::path iconsDirectory = GetExecutableDirectory() / "resourses" / "icons" / "ContentBrowser";
 		m_FolderIcon = std::make_shared<Texture>((iconsDirectory / "Folder_Icon.png").string());
 		m_FileIcon = std::make_shared<Texture>((iconsDirectory / "File_Icon.png").string());
+	}
+
+	void ContentBrowser::SetAssetsDirectory(const std::filesystem::path& assetsDirectory)
+	{
+		m_AssetsDir = assetsDirectory;
+		m_CurrendDir = assetsDirectory;
 	}
 
 	void ContentBrowser::OnImGuiRender()
 	{
 		ImGui::Begin("Content Browser");
 
-		if (m_CurrendDir != std::filesystem::path(g_AssetsDirectory))
+		if (!std::filesystem::is_directory(m_CurrendDir))
+		{
+			ImGui::Text("No project open.");
+			ImGui::End();
+			return;
+		}
+
+		if (m_CurrendDir != m_AssetsDir)
 		{
 			if (ImGui::Button("<-"))
 			{
@@ -48,7 +57,7 @@ namespace Revoke
 			ImGui::PushID(i++);
 
 			std::string pathString = entryPath.path().string();
-			auto relativePath = std::filesystem::relative(entryPath.path(), g_AssetsDirectory);
+			auto relativePath = std::filesystem::relative(entryPath.path(), m_AssetsDir);
 			std::string fileNameString = relativePath.filename().string();
 
 			Shared<Texture> icon = entryPath.is_directory() ? m_FolderIcon : m_FileIcon;

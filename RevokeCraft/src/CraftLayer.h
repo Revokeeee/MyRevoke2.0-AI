@@ -12,6 +12,8 @@
 #include "ToolBar.h"
 #include "SceneSettingsPannel.h"
 
+#include "MyRevoke/Project/Project.h"
+
 namespace Revoke
 {
 
@@ -31,6 +33,10 @@ namespace Revoke
 		bool OnMouseBtnPressed(MouseButtonPressedEvent& e);
 		bool OnKeyPressed(KeyPressedEvent& e);
 
+		void NewProject();
+		void OpenProject();
+		void OpenProject(const std::filesystem::path& projectFilePath);
+
 		void NewScene();
 		void OpenScene();
 		void OpenScene(const std::filesystem::path& path);
@@ -40,10 +46,13 @@ namespace Revoke
 		Shared<Scene> GetCurrentScene() const { return m_Scene; }
 
 	private:
+		void SetProject(Shared<Project> project);
+		std::filesystem::path GetAssetsDirectory() const;
 
 		Shared<FrameBuffers> m_FrameBuffer;
 
 		Shared<Scene> m_Scene;
+		Shared<Project> m_Project;
 
 		Entity m_CameraEntity;
 		Entity m_SecondCamera;
