@@ -16,7 +16,7 @@ namespace Revoke
 	Application* Application::s_Instance = nullptr;
 	
 
-	Application::Application()
+	Application::Application(const WindowSettings& windowSettings)
 
 	{
 		Log::Init();
@@ -25,7 +25,7 @@ namespace Revoke
 		RV_CORE_ASSERT(!s_Instance, "Application already exist");
 		s_Instance = this;
 
-		m_Window = std::make_shared<Window>();
+		m_Window = std::make_shared<Window>(windowSettings);
 		m_Window->SetEventCallback(RV_BIND_EVENT_FUNK(Application::OnEvent));
 
 

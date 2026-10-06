@@ -55,7 +55,16 @@ namespace Revoke
 		}
 
 
+		glfwWindowHint(GLFW_MAXIMIZED, settings.Maximized ? GLFW_TRUE : GLFW_FALSE);
+
 		m_Window = glfwCreateWindow((int)settings.Width, (int)settings.Height, m_Data.Title.c_str(), nullptr, nullptr);
+
+		// A maximized (or otherwise OS-clamped) window's real size differs from the
+		// requested one, so read it back before anything uses m_Data.Width/Height.
+		int actualWidth, actualHeight;
+		glfwGetWindowSize(m_Window, &actualWidth, &actualHeight);
+		m_Data.Width = actualWidth;
+		m_Data.Height = actualHeight;
 
 		m_Context = new RenderContex(m_Window);
 		m_Context->Init();

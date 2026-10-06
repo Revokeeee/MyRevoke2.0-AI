@@ -23,7 +23,7 @@ namespace Revoke
 	class  Application
 	{
 	public:
-		Application();
+		Application(const WindowSettings& windowSettings = WindowSettings());
 		virtual ~Application();
 
 		void Run();

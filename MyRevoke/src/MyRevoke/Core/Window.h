@@ -14,12 +14,14 @@ namespace Revoke {
 		std::string Title;
 		unsigned int Width;
 		unsigned int Height;
+		bool Maximized;
 
 		WindowSettings(const std::string& title = "MyRevoke",
 			unsigned int width = 1280,
-			unsigned int height = 720)
-			: Title(title), Width(width), Height(height){}
-		                               
+			unsigned int height = 720,
+			bool maximized = false)
+			: Title(title), Width(width), Height(height), Maximized(maximized){}
+
 	};
 
 	class Window
