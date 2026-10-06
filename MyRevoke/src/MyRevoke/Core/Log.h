@@ -6,7 +6,18 @@
 #include "spdlog/spdlog.h"
 #include "spdlog/fmt/ostr.h"
 
-namespace Revoke{ 
+namespace Revoke{
+	// One logged message, as kept for the editor's console.
+	struct LogEntry
+	{
+		spdlog::level::level_enum Level = spdlog::level::info;
+		// The logger's name: "MYREVOKE" for the engine, "APP" for the editor.
+		std::string Source;
+		std::string Message;
+		// Local time, HH:MM:SS.
+		std::string Time;
+	};
+
 	class  Log
 	{
 	public:
@@ -15,6 +26,13 @@ namespace Revoke{
 
 		static Shared<spdlog::logger> GetCoreLogger() { return s_EngineLogger; }
 		static Shared<spdlog::logger> GetClientLogger() { return s_EditorLogger; }
+
+		// The most recent messages from both loggers, oldest first. Only the last few thousand are kept.
+		static std::vector<LogEntry> GetHistory();
+		// Goes up with every message and every ClearHistory(), so a reader can skip copying the
+		// history when nothing changed.
+		static uint64_t GetHistoryVersion();
+		static void ClearHistory();
 
 	private:
 		static Shared<spdlog::logger> s_EngineLogger;
