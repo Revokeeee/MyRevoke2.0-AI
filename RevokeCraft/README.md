@@ -42,6 +42,14 @@ started from any working directory.
 - `mono/` — the Mono runtime distribution needed for embedded C# scripting.
 - `projects/Example/` — the example project (the old `assets/` content), opened on startup.
 
+## Shipping the editor
+
+`scripts/stage-editor.ps1` builds this project in `Dist` and assembles `dist/MyRevoke/`: the exe,
+`OpenAL32.dll`, `mono/lib`, `resourses/` and `projects/Example/`, with import libraries, debug info
+and build intermediates left out. The folder runs on a machine with no Visual Studio and no repo
+checkout, but it carries no MSVC runtime (`staticruntime "off"`), so that machine needs the
+**Microsoft Visual C++ 2015-2022 Redistributable (x64)**.
+
 ## Known issues
 
 - `SceneSettingsPannel.cpp` has a stray semicolon after an `if (ImGui::ColorEdit3(...))`, so the
