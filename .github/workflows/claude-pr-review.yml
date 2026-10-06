@@ -117,7 +117,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # --paginate runs --jq once per page, so emit one line per match and count lines.
-          count="$(gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews" \n            --jq ".[] | select(.user.login == \"github-actions[bot]\" and .submitted_at >= \"$REVIEW_START\") | .id" | wc -l)"
+          count="$(gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews" \
+            --jq ".[] | select(.user.login == \"github-actions[bot]\" and .submitted_at >= \"$REVIEW_START\") | .id" | wc -l)"
           if [ "${count:-0}" -lt 1 ]; then
             echo "::error::No review from github-actions[bot] was posted during this run."
             exit 1
