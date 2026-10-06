@@ -138,7 +138,7 @@ namespace Revoke
 	bool CraftLayer::BuildDefaultDockLayout(ImGuiID dockspaceId)
 	{
 		// A minimized window reports a zero size, which would make the splits below
-		// divide by zero. Skip it; the empty-dockspace check retries next frame.
+		// divide by zero. Skip it; the caller retries next frame.
 		ImVec2 viewportSize = ImGui::GetMainViewport()->Size;
 		if (viewportSize.x <= 0.0f || viewportSize.y <= 0.0f)
 			return false;
@@ -214,12 +214,11 @@ namespace Revoke
 		ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
 		if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
 		{
-			// Rebuild before DockSpace() submits the node this frame, never after it.
+			// Rebuild before DockSpace() submits the node this frame, never after it. If the
+			// build is skipped (zero-size window), keep the request: DockSpace() is about to
+			// create an empty node, so the "no node yet" check alone would never retry.
 			if (m_ResetLayoutRequested || ImGui::DockBuilderGetNode(dockspace_id) == nullptr)
-			{
-				if (BuildDefaultDockLayout(dockspace_id))
-					m_ResetLayoutRequested = false;
-			}
+				m_ResetLayoutRequested = !BuildDefaultDockLayout(dockspace_id);
 
 			ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
 		}
