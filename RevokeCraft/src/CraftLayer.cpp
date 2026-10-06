@@ -1,4 +1,5 @@
 #include "CraftLayer.h"
+#include "EditorUI.h"
 
 #include <chrono>
 #include <fstream>
@@ -70,8 +71,11 @@ namespace Revoke
 		}
 
 
+		// Per-frame numbers for the status bar.
+		Renderer2D::ResetStatistics();
+
 		m_FrameBuffer->Bind();
-		
+
 		RendererAPI::Clear();
 
 		m_FrameBuffer->ClearColorTextureAttachment(1, -1);
@@ -119,7 +123,7 @@ namespace Revoke
 	{
 		// A minimized window reports a zero size, which would make the splits below
 		// divide by zero. Skip it; the caller retries next frame.
-		ImVec2 viewportSize = ImGui::GetMainViewport()->Size;
+		ImVec2 viewportSize = ImGui::GetMainViewport()->WorkSize;
 		if (viewportSize.x <= 0.0f || viewportSize.y <= 0.0f)
 			return false;
 
@@ -156,6 +160,7 @@ namespace Revoke
 
 		ImGui::DockBuilderDockWindow("Scene Settings", settingsId);
 		ImGui::DockBuilderDockWindow("Properties", propertiesId);
+		ImGui::DockBuilderDockWindow("Console", bottomId);
 		ImGui::DockBuilderDockWindow("Content Browser", bottomId);
 		ImGui::DockBuilderDockWindow("Scene Hierarchy", leftId);
 		ImGui::DockBuilderDockWindow("##toolbar", toolbarId);
@@ -181,12 +186,17 @@ namespace Revoke
 		bool opt_fullscreen = opt_fullscreen_persistant;
 		static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
 
+		// Before the dockspace window, so the space it takes at the bottom is known this frame.
+		UpdateSceneStatus();
+		DrawStatusBar();
+
 		ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
 		if (opt_fullscreen)
 		{
+			// The work area is the viewport minus the status bar.
 			ImGuiViewport* viewport = ImGui::GetMainViewport();
-			ImGui::SetNextWindowPos(viewport->Pos);
-			ImGui::SetNextWindowSize(viewport->Size);
+			ImGui::SetNextWindowPos(viewport->WorkPos);
+			ImGui::SetNextWindowSize(viewport->WorkSize);
 			ImGui::SetNextWindowViewport(viewport->ID);
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
@@ -275,6 +285,7 @@ namespace Revoke
 		m_ObjPannel.OnImGuiRender();
 		m_ContentBrowserPanel.OnImGuiRender();
 		m_ProjectSettingsPanel.OnImGuiRender();
+		m_ConsolePanel.OnImGuiRender();
 		//-----------ViewPort-------------------------------------------------
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
 		ImGui::Begin("Viewport");
@@ -633,6 +644,8 @@ namespace Revoke
 
 		m_SavedSceneState = text;
 		m_ScenePath = file;
+		m_SceneModified = false;
+		RV_EDITOR_INFO("Saved the scene to {}", file.string());
 		return true;
 	}
 
@@ -645,6 +658,88 @@ namespace Revoke
 	void CraftLayer::MarkSceneSaved()
 	{
 		m_SavedSceneState = SerializeScene();
+		m_SceneModified = false;
+	}
+
+	void CraftLayer::UpdateSceneStatus()
+	{
+		if (ImGui::GetTime() - m_LastModifiedCheck > 0.5)
+		{
+			m_SceneModified = HasUnsavedChanges();
+			m_LastModifiedCheck = ImGui::GetTime();
+		}
+
+		// "Scene name* - Project - MyRevoke", like other editors, so the taskbar says what is open.
+		std::string title = m_Scene->GetName() + (m_SceneModified ? "*" : "");
+		if (m_Project)
+			title += " - " + m_Project->GetName();
+		title += " - MyRevoke";
+		Application::Get().GetWindow().SetTitle(title);
+	}
+
+	void CraftLayer::DrawStatusBar()
+	{
+		const float scale = ImGuiLayer::GetUIScale();
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * scale, 4.0f * scale));
+		ImGui::PushStyleColor(ImGuiCol_MenuBarBg, Theme::BackgroundDark);
+		const ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_MenuBar;
+		if (ImGui::BeginViewportSideBar("##StatusBar", ImGui::GetMainViewport(), ImGuiDir_Down, ImGui::GetFrameHeight(), flags))
+		{
+			if (ImGui::BeginMenuBar())
+			{
+				const ImVec4 separatorColor = Theme::TextDisabled;
+				auto separator = [&]() { ImGui::TextColored(separatorColor, "|"); };
+
+				// Mode
+				if (m_ToolBar.GetSceneState() == SceneState::Runtime)
+					ImGui::TextColored(Theme::Accent, RV_ICON_PLAY "  Playing");
+				else
+					ImGui::TextColored(Theme::TextMuted, RV_ICON_PENCIL "  Editing");
+				separator();
+
+				// Scene and whether it has unsaved changes
+				ImGui::TextColored(Theme::TextMuted, RV_ICON_GLOBE);
+				ImGui::TextUnformatted(m_Scene->GetName().c_str());
+				UI::Tooltip(m_ScenePath.empty() ? "Not saved to a file yet" : m_ScenePath.string().c_str());
+				if (m_SceneModified)
+				{
+					ImGui::TextColored(Theme::Warning, "Modified");
+					UI::Tooltip("Unsaved changes. Ctrl+S saves.");
+				}
+				separator();
+
+				// The latest log message; a click opens the console.
+				if (const LogEntry* latest = m_ConsolePanel.GetLatestEntry())
+				{
+					ImVec4 color = latest->Level >= spdlog::level::err ? Theme::Error : latest->Level == spdlog::level::warn ? Theme::Warning : Theme::TextMuted;
+					const char* icon = latest->Level >= spdlog::level::err ? RV_ICON_ERROR : latest->Level == spdlog::level::warn ? RV_ICON_WARNING : RV_ICON_INFO;
+					ImGui::PushStyleColor(ImGuiCol_Text, color);
+					ImGui::Text("%s  %s", icon, latest->Message.c_str());
+					ImGui::PopStyleColor();
+					if (ImGui::IsItemClicked())
+						ImGui::SetWindowFocus("Console");
+					UI::Tooltip("Click to open the Console");
+				}
+
+				// Stats, right-aligned
+				Renderer2D::Stats stats = Renderer2D::GetStats();
+				char statsText[128];
+				std::snprintf(statsText, sizeof(statsText), "%d entities   %u quads   %u draw calls   %.0f FPS",
+					(int)GetCurrentScene()->GetEntityCount(), stats.QuadCount, stats.DrawCalls, ImGui::GetIO().Framerate);
+				float statsWidth = ImGui::CalcTextSize(statsText).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+				float statsX = ImGui::GetWindowContentRegionMax().x - statsWidth;
+				if (statsX > ImGui::GetCursorPosX())
+				{
+					ImGui::SetCursorPosX(statsX);
+					ImGui::TextColored(Theme::TextMuted, "%s", statsText);
+				}
+
+				ImGui::EndMenuBar();
+			}
+		}
+		ImGui::End();
+		ImGui::PopStyleColor();
+		ImGui::PopStyleVar();
 	}
 
 	bool CraftLayer::HasUnsavedChanges()

@@ -36,6 +36,7 @@ namespace Revoke
 			// Every entity, oldest first. The registry itself iterates newest first, which made the
 			// hierarchy and the scene file flip order on every save and reload.
 			std::vector<Entity> GetEntities();
+			size_t GetEntityCount();
 
 			// Returns an empty Entity when no entity has this id.
 			Entity FindEntityByUUID(UUID id);

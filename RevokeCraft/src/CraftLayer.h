@@ -11,6 +11,7 @@
 #include "ContentBrowser.h"
 #include "ToolBar.h"
 #include "SceneSettingsPannel.h"
+#include "ConsolePanel.h"
 
 #include "MyRevoke/Project/Project.h"
 
@@ -70,6 +71,9 @@ namespace Revoke
 		void DrawSavePrompt();
 		void DrawShortcutsWindow();
 		void HandleShortcuts();
+		void DrawStatusBar();
+		// Keeps the window title and the unsaved-changes marker up to date.
+		void UpdateSceneStatus();
 
 		void SetProject(Shared<Project> project);
 		std::filesystem::path GetAssetsDirectory() const;
@@ -91,6 +95,9 @@ namespace Revoke
 		std::function<void()> m_PendingAction;
 		bool m_ResetLayoutRequested = false;
 		bool m_ShowShortcuts = false;
+		// Checked twice a second rather than every frame: it serializes the whole scene.
+		bool m_SceneModified = false;
+		double m_LastModifiedCheck = 0.0;
 
 		Entity m_CameraEntity;
 		Entity m_SecondCamera;
@@ -103,6 +110,7 @@ namespace Revoke
 		ContentBrowser m_ContentBrowserPanel;
 		ToolBar m_ToolBar;
 		SceneSettingsPannel m_ProjectSettingsPanel;
+		ConsolePanel m_ConsolePanel;
 
 		bool m_PrimaryCamera = true;
 		glm::vec2 m_ViewportSize = { 0.0f, 0.0f };

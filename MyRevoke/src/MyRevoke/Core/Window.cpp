@@ -179,6 +179,15 @@ namespace Revoke
 		m_Data.VSync = cond;
 	}
 
+	void Window::SetTitle(const std::string& title)
+	{
+		if (title == m_Data.Title)
+			return;
+
+		m_Data.Title = title;
+		glfwSetWindowTitle(m_Window, title.c_str());
+	}
+
 	bool Window::IsVSync() const
 	{
 		return m_Data.VSync;
