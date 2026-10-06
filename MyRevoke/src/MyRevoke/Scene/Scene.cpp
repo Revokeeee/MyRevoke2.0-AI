@@ -6,6 +6,7 @@
 #include "Scene.h"
 #include "Components.h"
 #include "Entity.h"
+#include "Serializer.h"
 
 #include <fstream>
 
@@ -36,7 +37,23 @@ namespace Revoke
 
     Scene::~Scene()
     {
-       
+
+    }
+
+    Shared<Scene> Scene::Copy(const Shared<Scene>& source, const std::filesystem::path& assetsDirectory)
+    {
+        Serializer sourceSerializer(source, assetsDirectory);
+        std::string snapshot = sourceSerializer.SerializeToString();
+
+        Shared<Scene> copy = std::make_shared<Scene>();
+        Serializer copySerializer(copy, assetsDirectory);
+        copySerializer.DeserializeFromString(snapshot);
+
+        // Scene settings the scene file does not store.
+        copy->SetGravityStats(source->m_PositionIteration, source->m_VelocityIteration);
+        copy->OnViewportResize(source->m_ViewportWidth, source->m_ViewportHeight);
+
+        return copy;
     }
 
     Entity Scene::CreateEntity(const std::string name)
@@ -59,6 +76,17 @@ namespace Revoke
 
         entName.Name = name.empty() ? "UnNamed Entity" : name;
         return entity;
+    }
+
+    Entity Scene::FindEntityByUUID(UUID id)
+    {
+        auto view = m_Registry.view<IdComponent>();
+        for (auto ent : view)
+        {
+            if (view.get<IdComponent>(ent).ID == id)
+                return { ent, this };
+        }
+        return {};
     }
 
 
@@ -240,6 +268,21 @@ namespace Revoke
     }
     void Scene::OnRuntimeStop()
     {
+        m_Registry.view<NativeScriptComponent>().each([](auto entity, auto& nsc)
+            {
+                if (!nsc.Instance)
+                    return;
+
+                nsc.Instance->OnDestroy();
+                delete nsc.Instance;
+                nsc.Instance = nullptr;
+            });
+
+        m_Registry.view<RigidBodyComponent>().each([](auto entity, auto& rigidBody)
+            {
+                rigidBody.Body = nullptr;
+            });
+
         delete m_B2World;
         m_B2World = nullptr;
     }

@@ -45,9 +45,15 @@ namespace Revoke
 		bool SaveAs();
 		bool Save();
 
-		Shared<Scene> GetCurrentScene() const { return m_Scene; }
+		// The scene being played while in Play mode, otherwise the scene being edited.
+		Shared<Scene> GetCurrentScene() const { return m_RuntimeScene ? m_RuntimeScene : m_Scene; }
 
 	private:
+		void OnScenePlay();
+		void OnSceneStop();
+		void StopPlayingScene();
+		void SetPanelsScene(const Shared<Scene>& scene);
+
 		std::string SerializeScene();
 		void MarkSceneSaved();
 		bool HasUnsavedChanges();
@@ -60,7 +66,10 @@ namespace Revoke
 
 		Shared<FrameBuffers> m_FrameBuffer;
 
+		// The scene being edited. Play runs on m_RuntimeScene, a copy made on Play and thrown away
+		// on Stop, so playing never changes m_Scene and saving always writes m_Scene.
 		Shared<Scene> m_Scene;
+		Shared<Scene> m_RuntimeScene;
 		Shared<Project> m_Project;
 
 		// The scene as last saved, opened or created, to tell whether it has unsaved changes.

@@ -40,6 +40,7 @@ namespace Revoke
 	}
 	CraftLayer::~CraftLayer()
 	{
+		StopPlayingScene();
 		m_Scene->OnSceneClose();
 	}
 	void CraftLayer::OnAttach()
@@ -54,9 +55,8 @@ namespace Revoke
 
 		m_EditorCamera = EditorCamera(30.0f, 1.778f, 0.1f, 1000.0f);
 
-		m_ObjPannel.SetScene(m_Scene);
-		m_ToolBar.SetScene(m_Scene);
-		m_ProjectSettingsPanel.SetScene(m_Scene);
+		SetPanelsScene(m_Scene);
+		m_ToolBar.SetPlayCallbacks([this]() { OnScenePlay(); }, [this]() { OnSceneStop(); });
 
 		m_GizmoType = new int(-1);
 
@@ -83,6 +83,8 @@ namespace Revoke
 			m_EditorCamera.SetViewportSize(m_ViewportSize.x, m_ViewportSize.y);
 
 			m_Scene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
+			if (m_RuntimeScene)
+				m_RuntimeScene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
 		}
 
 
@@ -109,7 +111,7 @@ namespace Revoke
 		}
 		case SceneState::Runtime:
 		{
-			m_Scene->OnRuntimeUpdate(deltaTime);
+			m_RuntimeScene->OnRuntimeUpdate(deltaTime);
 			break;
 		}
 		}
@@ -124,7 +126,7 @@ namespace Revoke
 		if (mouseX >= 0 && mouseY >= 0 && mouseX < (int)viewportSize.x && mouseY < (int)viewportSize.y)
 		{
 			int pixelData = m_FrameBuffer->ReadPixel(1, mouseX, mouseY);
-			m_HoveredEntity = pixelData == -1 ? Entity() : Entity((entt::entity)pixelData, m_Scene.get());
+			m_HoveredEntity = pixelData == -1 ? Entity() : Entity((entt::entity)pixelData, GetCurrentScene().get());
 		}
 		
 		m_FrameBuffer->UnBind();
@@ -406,14 +408,41 @@ namespace Revoke
 		NewScene();
 	}
 
+	void CraftLayer::OnScenePlay()
+	{
+		m_RuntimeScene = Scene::Copy(m_Scene, GetAssetsDirectory());
+		m_RuntimeScene->OnRuntimeStart();
+		SetPanelsScene(m_RuntimeScene);
+	}
+
+	void CraftLayer::OnSceneStop()
+	{
+		m_RuntimeScene->OnRuntimeStop();
+		m_RuntimeScene->OnSceneClose();
+		m_RuntimeScene.reset();
+		m_HoveredEntity = {};
+		SetPanelsScene(m_Scene);
+	}
+
+	void CraftLayer::StopPlayingScene()
+	{
+		if (m_ToolBar.GetSceneState() == SceneState::Runtime)
+			m_ToolBar.OnSceneStop();
+	}
+
+	void CraftLayer::SetPanelsScene(const Shared<Scene>& scene)
+	{
+		m_ObjPannel.SetScene(scene);
+		m_ProjectSettingsPanel.SetScene(scene);
+	}
+
 	void CraftLayer::NewScene()
 	{
+		StopPlayingScene();
 		m_Scene = std::make_shared<Scene>("New scene");
 		m_Scene->OnSceneClose();
 		m_Scene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
-		m_ObjPannel.SetScene(m_Scene);
-		m_ToolBar.SetScene(m_Scene);
-		m_ProjectSettingsPanel.SetScene(m_Scene);
+		SetPanelsScene(m_Scene);
 
 		m_ScenePath.clear();
 		MarkSceneSaved();
@@ -430,10 +459,7 @@ namespace Revoke
 	}
 	void CraftLayer::OpenScene(const std::filesystem::path& path)
 	{
-		if (m_ToolBar.GetSceneState() == SceneState::Runtime)
-		{
-			m_ToolBar.OnSceneStop();
-		}
+		StopPlayingScene();
 		m_Scene = std::make_shared<Scene>();
 		m_Scene->OnSceneClose();
 		m_Scene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
@@ -441,9 +467,7 @@ namespace Revoke
 		Serializer sceneSerializer(m_Scene, GetAssetsDirectory());
  		bool loaded = sceneSerializer.DeSerealize(path.string());
 
-		m_ObjPannel.SetScene(m_Scene);
-		m_ToolBar.SetScene(m_Scene);
-		m_ProjectSettingsPanel.SetScene(m_Scene);
+		SetPanelsScene(m_Scene);
 
 		m_ScenePath = loaded ? path : std::filesystem::path();
 		MarkSceneSaved();

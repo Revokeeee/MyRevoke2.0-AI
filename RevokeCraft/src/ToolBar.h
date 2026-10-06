@@ -2,7 +2,7 @@
 
 #include "MyRevoke/Renderer/Texture.h"
 #include "MyRevoke/Core/Core.h"
-#include "MyRevoke/Scene/Scene.h"
+#include <functional>
 
 namespace Revoke
 {
@@ -21,7 +21,8 @@ namespace Revoke
 		void OnScenePlay();
 		void OnSceneStop();
 
-		void SetScene(Shared<Scene> currentScene);
+		// The owner creates and discards the play-mode scene; the toolbar only tracks the state.
+		void SetPlayCallbacks(std::function<void()> onPlay, std::function<void()> onStop);
 		void SetGuizmo(int* guizmo);
 
 		SceneState GetSceneState() const { return m_SceneState; }
@@ -32,7 +33,8 @@ namespace Revoke
 		Shared<Texture> m_PlayIcon;
 		Shared<Texture> m_StopIcon;
 
-		Shared<Scene> m_CurrentScene;
+		std::function<void()> m_OnPlay;
+		std::function<void()> m_OnStop;
 
 		int* m_Guizmo;
 
