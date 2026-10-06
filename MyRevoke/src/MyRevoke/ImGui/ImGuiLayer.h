@@ -18,6 +18,8 @@ namespace Revoke {
 		Large,
 		// Fixed width, for the console and anything code-like.
 		Mono,
+		// RV_ICON_* glyphs alone at 48px, for big tile icons. Has no text glyphs.
+		Icons,
 		Count
 	};
 

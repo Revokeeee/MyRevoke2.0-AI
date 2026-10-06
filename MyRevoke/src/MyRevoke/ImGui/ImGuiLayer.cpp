@@ -42,6 +42,19 @@ namespace
 		return {};
 	}
 
+	// Only the glyphs the editor uses. Built once; the atlas reads it when it builds.
+	const ImWchar* IconGlyphRanges()
+	{
+		static ImVector<ImWchar> iconRanges;
+		if (iconRanges.empty())
+		{
+			ImFontGlyphRangesBuilder builder;
+			builder.AddText(RV_ICONS_ALL);
+			builder.BuildRanges(&iconRanges);
+		}
+		return iconRanges.Data;
+	}
+
 	ImFont* AddFont(const std::filesystem::path& textFont, float size, const std::filesystem::path& iconFont, float iconSize)
 	{
 		ImGuiIO& io = ImGui::GetIO();
@@ -63,22 +76,13 @@ namespace
 
 		if (!iconFont.empty())
 		{
-			// Only the glyphs the editor uses. Built once; the atlas reads it when it builds.
-			static ImVector<ImWchar> iconRanges;
-			if (iconRanges.empty())
-			{
-				ImFontGlyphRangesBuilder builder;
-				builder.AddText(RV_ICONS_ALL);
-				builder.BuildRanges(&iconRanges);
-			}
-
 			ImFontConfig config;
 			config.MergeMode = true;
 			config.PixelSnapH = true;
 			config.GlyphMinAdvanceX = iconSize;
 			// The icon font sits higher than Segoe UI's baseline; nudge it to line up with the text.
 			config.GlyphOffset.y = iconSize * 0.18f;
-			io.Fonts->AddFontFromFileTTF(iconFont.string().c_str(), iconSize, &config, iconRanges.Data);
+			io.Fonts->AddFontFromFileTTF(iconFont.string().c_str(), iconSize, &config, IconGlyphRanges());
 		}
 
 		return font;
@@ -100,6 +104,14 @@ namespace
 		s_Fonts[(size_t)Revoke::FontStyle::Bold] = AddFont(semibold, size, icons, size);
 		s_Fonts[(size_t)Revoke::FontStyle::Large] = AddFont(semibold, largeSize, icons, largeSize);
 		s_Fonts[(size_t)Revoke::FontStyle::Mono] = AddFont(mono, std::round(15.0f * scale), icons, size);
+
+		// Icons alone at tile size, so the Content Browser's big icons stay sharp.
+		if (!icons.empty())
+		{
+			ImFontConfig config;
+			config.PixelSnapH = true;
+			s_Fonts[(size_t)Revoke::FontStyle::Icons] = ImGui::GetIO().Fonts->AddFontFromFileTTF(icons.string().c_str(), std::round(48.0f * scale), &config, IconGlyphRanges());
+		}
 	}
 }
 
