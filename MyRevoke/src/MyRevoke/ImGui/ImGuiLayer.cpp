@@ -1,5 +1,7 @@
 #include "rvpch.h" 
 #include "ImGuiLayer.h"
+#include "ImGuiTheme.h"
+#include "ImGuiIcons.h"
 
 #include <imgui.h>
 #include <backends/imgui_impl_opengl3.h>
@@ -12,6 +14,105 @@
 #include <glad/glad.h>
 
 #include <ImGuizmo.h>
+
+#include <array>
+#include <cmath>
+#include <cstdlib>
+#include <filesystem>
+
+namespace
+{
+	std::array<ImFont*, (size_t)Revoke::FontStyle::Count> s_Fonts{};
+	float s_UIScale = 1.0f;
+
+	// The engine only builds for Windows, so the editor uses the fonts every Windows install has
+	// rather than shipping its own. Missing files fall back to ImGui's built-in font.
+	std::filesystem::path FindSystemFont(std::initializer_list<const char*> fileNames)
+	{
+		const char* windowsDirectory = std::getenv("WINDIR");
+		std::filesystem::path fontsDirectory = std::filesystem::path(windowsDirectory ? windowsDirectory : "C:\Windows") / "Fonts";
+
+		for (const char* fileName : fileNames)
+		{
+			std::error_code error;
+			std::filesystem::path candidate = fontsDirectory / fileName;
+			if (std::filesystem::exists(candidate, error))
+				return candidate;
+		}
+		return {};
+	}
+
+	ImFont* AddFont(const std::filesystem::path& textFont, float size, const std::filesystem::path& iconFont, float iconSize)
+	{
+		ImGuiIO& io = ImGui::GetIO();
+
+		ImFont* font = nullptr;
+		if (!textFont.empty())
+		{
+			ImFontConfig config;
+			config.OversampleH = 3;
+			// Latin plus Cyrillic, so asset and entity names in either show up.
+			font = io.Fonts->AddFontFromFileTTF(textFont.string().c_str(), size, &config, io.Fonts->GetGlyphRangesCyrillic());
+		}
+		if (!font)
+		{
+			ImFontConfig config;
+			config.SizePixels = size;
+			font = io.Fonts->AddFontDefault(&config);
+		}
+
+		if (!iconFont.empty())
+		{
+			// Only the glyphs the editor uses. Built once; the atlas reads it when it builds.
+			static ImVector<ImWchar> iconRanges;
+			if (iconRanges.empty())
+			{
+				ImFontGlyphRangesBuilder builder;
+				builder.AddText(RV_ICONS_ALL);
+				builder.BuildRanges(&iconRanges);
+			}
+
+			ImFontConfig config;
+			config.MergeMode = true;
+			config.PixelSnapH = true;
+			config.GlyphMinAdvanceX = iconSize;
+			// The icon font sits higher than Segoe UI's baseline; nudge it to line up with the text.
+			config.GlyphOffset.y = iconSize * 0.18f;
+			io.Fonts->AddFontFromFileTTF(iconFont.string().c_str(), iconSize, &config, iconRanges.Data);
+		}
+
+		return font;
+	}
+
+	void LoadFonts(float scale)
+	{
+		std::filesystem::path regular = FindSystemFont({ "segoeui.ttf" });
+		std::filesystem::path semibold = FindSystemFont({ "seguisb.ttf", "segoeuib.ttf", "segoeui.ttf" });
+		std::filesystem::path mono = FindSystemFont({ "CascadiaMono.ttf", "consola.ttf" });
+		// Segoe Fluent Icons ships with Windows 11, Segoe MDL2 Assets with Windows 10.
+		std::filesystem::path icons = FindSystemFont({ "SegoeIcons.ttf", "segmdl2.ttf" });
+
+		const float size = std::round(16.0f * scale);
+		const float largeSize = std::round(20.0f * scale);
+
+		// The first font added is ImGui's default.
+		s_Fonts[(size_t)Revoke::FontStyle::Regular] = AddFont(regular, size, icons, size);
+		s_Fonts[(size_t)Revoke::FontStyle::Bold] = AddFont(semibold, size, icons, size);
+		s_Fonts[(size_t)Revoke::FontStyle::Large] = AddFont(semibold, largeSize, icons, largeSize);
+		s_Fonts[(size_t)Revoke::FontStyle::Mono] = AddFont(mono, std::round(15.0f * scale), icons, size);
+	}
+}
+
+ImFont* Revoke::ImGuiLayer::GetFont(FontStyle style)
+{
+	ImFont* font = s_Fonts[(size_t)style];
+	return font ? font : ImGui::GetFont();
+}
+
+float Revoke::ImGuiLayer::GetUIScale()
+{
+	return s_UIScale;
+}
 
 Revoke::ImGuiLayer::ImGuiLayer()
 	: Layer("ImGuiLayer")
@@ -33,64 +134,22 @@ void Revoke::ImGuiLayer::OnAttach()
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;           // Enable Docking
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;         // Enable Multi-Viewport / Platform Windows
 
-    // Setup Dear ImGui style
-    ImGui::StyleColorsDark(); // Start with the dark theme
-
-    ImGuiStyle& style = ImGui::GetStyle();
-    if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-    {
-        style.WindowRounding = 5.0f; // Slight rounding of window corners
-        style.Colors[ImGuiCol_WindowBg].w = 1.0f;
-    }
-
-    // General style customization
-    style.FrameRounding = 4.0f;            // Rounded corners for buttons and frames
-    style.GrabRounding = 4.0f;             // Rounded corners for slider handles
-    style.WindowBorderSize = 0.0f;         // No borders on windows
-    style.FrameBorderSize = 0.0f;          // No borders around widgets
-    style.PopupBorderSize = 0.0f;          // No borders around popups
-    style.ScrollbarRounding = 9.0f;        // Rounded scrollbars
-
-    // Adjust spacing and padding
-    style.WindowPadding = ImVec2(8, 8);    // Padding within windows
-    style.ItemSpacing = ImVec2(8, 4);      // Spacing between widgets
-    style.ItemInnerSpacing = ImVec2(4, 4); // Spacing inside widgets
-
-    // Color adjustments for a unified dark grey theme
-    ImVec4* colors = ImGui::GetStyle().Colors;
-    colors[ImGuiCol_Text] = ImVec4(0.80f, 0.80f, 0.83f, 1.00f);
-    colors[ImGuiCol_WindowBg] = ImVec4(0.12f, 0.12f, 0.14f, 1.00f);
-    colors[ImGuiCol_ChildBg] = ImVec4(0.15f, 0.15f, 0.18f, 1.00f);
-    colors[ImGuiCol_PopupBg] = ImVec4(0.08f, 0.08f, 0.08f, 0.94f);
-    colors[ImGuiCol_Border] = ImVec4(0.20f, 0.20f, 0.20f, 0.50f);
-    colors[ImGuiCol_FrameBg] = ImVec4(0.20f, 0.21f, 0.22f, 0.54f);
-    colors[ImGuiCol_FrameBgHovered] = ImVec4(0.40f, 0.40f, 0.40f, 0.40f);
-    colors[ImGuiCol_FrameBgActive] = ImVec4(0.28f, 0.28f, 0.28f, 0.67f);
-    colors[ImGuiCol_TitleBg] = ImVec4(0.12f, 0.12f, 0.14f, 1.00f);
-    colors[ImGuiCol_TitleBgActive] = ImVec4(0.15f, 0.15f, 0.15f, 1.00f);
-    colors[ImGuiCol_CheckMark] = ImVec4(0.40f, 0.40f, 0.40f, 0.90f);
-    colors[ImGuiCol_SliderGrab] = ImVec4(0.24f, 0.24f, 0.26f, 1.00f);
-    colors[ImGuiCol_SliderGrabActive] = ImVec4(0.40f, 0.40f, 0.40f, 1.00f);
-    colors[ImGuiCol_Button] = ImVec4(0.24f, 0.24f, 0.26f, 1.00f);
-    colors[ImGuiCol_ButtonHovered] = ImVec4(0.28f, 0.28f, 0.30f, 1.00f);
-    colors[ImGuiCol_ButtonActive] = ImVec4(0.30f, 0.30f, 0.33f, 1.00f);
-    colors[ImGuiCol_Header] = ImVec4(0.22f, 0.22f, 0.24f, 1.00f);
-    colors[ImGuiCol_HeaderHovered] = ImVec4(0.25f, 0.25f, 0.27f, 1.00f);
-    colors[ImGuiCol_HeaderActive] = ImVec4(0.28f, 0.28f, 0.28f, 1.00f);
-    colors[ImGuiCol_Separator] = colors[ImGuiCol_Border];
-    colors[ImGuiCol_SeparatorHovered] = ImVec4(0.26f, 0.59f, 0.98f, 0.78f);
-    colors[ImGuiCol_SeparatorActive] = ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
-    colors[ImGuiCol_ResizeGrip] = ImVec4(0.26f, 0.26f, 0.26f, 0.25f);
-    colors[ImGuiCol_ResizeGripHovered] = ImVec4(0.26f, 0.59f, 0.98f, 0.67f);
-    colors[ImGuiCol_ResizeGripActive] = ImVec4(0.26f, 0.59f, 0.98f, 0.95f);
-    colors[ImGuiCol_Tab] = ImVec4(0.18f, 0.18f, 0.19f, 1.00f);
-    colors[ImGuiCol_TabHovered] = ImVec4(0.26f, 0.26f, 0.28f, 0.80f);
-    colors[ImGuiCol_TabActive] = ImVec4(0.20f, 0.20f, 0.22f, 1.00f);
-    colors[ImGuiCol_TabUnfocused] = ImVec4(0.12f, 0.12f, 0.14f, 1.00f);
-    colors[ImGuiCol_TabUnfocusedActive] = ImVec4(0.18f, 0.18f, 0.19f, 1.00f);
+    // Dragging inside a panel (e.g. orbiting the viewport) must not move the panel.
+    io.ConfigWindowsMoveFromTitleBarOnly = true;
+    // A plain click on a drag field types a value; dragging still scrubs it.
+    io.ConfigDragClickToInputText = true;
 
     Application& app = Application::Get();
     GLFWwindow* window = static_cast<GLFWwindow*>(app.GetWindow().GetCoreWindow());
+
+    // Match the monitor's scaling (125%, 150%, ...) so text stays readable on high-DPI screens.
+    float xScale = 1.0f, yScale = 1.0f;
+    glfwGetWindowContentScale(window, &xScale, &yScale);
+    float contentScale = xScale > yScale ? xScale : yScale;
+    s_UIScale = contentScale > 1.0f ? contentScale : 1.0f;
+
+    LoadFonts(s_UIScale);
+    Theme::Apply(s_UIScale);
 
     // Setup Platform/Renderer bindings
     ImGui_ImplGlfw_InitForOpenGL(window, true);
