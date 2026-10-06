@@ -43,15 +43,19 @@ namespace Revoke
 		if (ImGui::DragInt("Set Gravity Velocity Iteration", &GravityVelocityIteration, 0, 100))
 			m_CurrentScene->SetGravityVelocityIteration(GravityVelocityIteration);
 
+		// Needs MSBuild and the repo checkout, neither of which a shipped
+		// editor has, so Dist builds don't offer it (#36, #78).
+#ifndef RV_DIST
 		if (ImGui::Button("Build Scripts"))
 		{
 #ifdef RV_DEBUG
 			system("msbuild ../MyRevoke-NativeScriptCore/MyRevoke-NativeScriptCore.vcxproj /p:Configuration=Debug /p:Platform=x64");
 #else
 			system("msbuild ../MyRevoke-NativeScriptCore/MyRevoke-NativeScriptCore.vcxproj /p:Configuration=Release /p:Platform=x64");
-#endif 
+#endif
 
 		}
+#endif
 
 		ImGui::End();
 	}
