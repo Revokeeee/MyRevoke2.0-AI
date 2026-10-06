@@ -30,7 +30,7 @@ namespace
 	std::filesystem::path FindSystemFont(std::initializer_list<const char*> fileNames)
 	{
 		const char* windowsDirectory = std::getenv("WINDIR");
-		std::filesystem::path fontsDirectory = std::filesystem::path(windowsDirectory ? windowsDirectory : "C:\Windows") / "Fonts";
+		std::filesystem::path fontsDirectory = std::filesystem::path(windowsDirectory ? windowsDirectory : "C:\\Windows") / "Fonts";
 
 		for (const char* fileName : fileNames)
 		{
