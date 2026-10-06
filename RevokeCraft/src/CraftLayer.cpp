@@ -10,6 +10,7 @@
 #include "MyRevoke/Scripting/NativeScript.h"
 #include "MyRevoke/Core/Input.h"
 #include <ImGuizmo.h>
+#include <imgui_internal.h>
 
 namespace Revoke
 {
@@ -132,6 +133,26 @@ namespace Revoke
 
 	}
 
+	void CraftLayer::BuildDefaultDockLayout(ImGuiID dockspaceId)
+	{
+		ImGui::DockBuilderRemoveNode(dockspaceId);
+		ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
+		ImGui::DockBuilderSetNodeSize(dockspaceId, ImGui::GetMainViewport()->Size);
+
+		ImGuiID centerId = dockspaceId;
+		ImGuiID bottomId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Down, 0.25f, nullptr, &centerId);
+		ImGuiID leftId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Left, 0.20f, nullptr, &centerId);
+		ImGuiID rightId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Right, 0.30f, nullptr, &centerId);
+
+		ImGui::DockBuilderDockWindow("Content Browser", bottomId);
+		ImGui::DockBuilderDockWindow("Scene Hierarchy", leftId);
+		ImGui::DockBuilderDockWindow("Properties", rightId);
+		ImGui::DockBuilderDockWindow("Scene Settings", rightId);
+		ImGui::DockBuilderDockWindow("Viewport", centerId);
+
+		ImGui::DockBuilderFinish(dockspaceId);
+	}
+
 	void CraftLayer::OnImGuiDraw()
 	{
 		static bool dockspaceOpen = true;
@@ -163,9 +184,12 @@ namespace Revoke
 
 		// DockSpace
 		ImGuiIO& io = ImGui::GetIO();
+		ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
 		if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
 		{
-			ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
+			if (ImGui::DockBuilderGetNode(dockspace_id) == nullptr)
+				BuildDefaultDockLayout(dockspace_id);
+
 			ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
 		}
 
@@ -180,10 +204,16 @@ namespace Revoke
 				if (ImGui::MenuItem("Open", "Ctrl+O")) OpenScene();
 				if (ImGui::MenuItem("Save", "Ctrl+S")) Save();
 				if (ImGui::MenuItem("Save as", "Ctrl+Shift+S")) SaveAs();
-	
+
 				ImGui::EndMenu();
 			}
-			
+
+			if (ImGui::BeginMenu("View"))
+			{
+				if (ImGui::MenuItem("Reset Layout")) BuildDefaultDockLayout(dockspace_id);
+
+				ImGui::EndMenu();
+			}
 
 			ImGui::EndMenuBar();
 		}

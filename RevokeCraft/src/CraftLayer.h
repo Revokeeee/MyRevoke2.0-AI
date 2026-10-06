@@ -52,6 +52,11 @@ namespace Revoke
 		void StopPlayingScene();
 		void SetPanelsScene(const Shared<Scene>& scene);
 
+		// Docks Viewport/Scene Hierarchy/Properties/Scene Settings/Content Browser into a
+		// sensible default layout. Only called when no layout has been saved yet, or from
+		// View > Reset Layout.
+		void BuildDefaultDockLayout(ImGuiID dockspaceId);
+
 		void SetProject(Shared<Project> project);
 		std::filesystem::path GetAssetsDirectory() const;
 
