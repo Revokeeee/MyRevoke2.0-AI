@@ -348,6 +348,9 @@ OpenCover/
 /RevokeCraft/RevokeCraft.lib
 /RevokeCraft/RevokeCraft.ilk
 
+# scripts/stage-editor.ps1 assembles the shippable editor folder here
+/dist/
+
 !MyRevoke/vendor/OpenALBuild/**
 !MyRevoke/vendor/libsndfile/**
 !MyRevoke/vendor/mono/**
