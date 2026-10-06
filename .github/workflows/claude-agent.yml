@@ -337,7 +337,7 @@ jobs:
           issues="$(gh api "repos/$REPO/issues?state=all&creator=github-actions%5Bbot%5D&since=$start&per_page=50" \
             --jq ".[] | select(.pull_request == null and .created_at >= \"$start\" and ($refs)) | \"- Issue #\(.number): \(.html_url)\"" || true)"
           comments="$(gh api --paginate "repos/$REPO/issues/$NUMBER/comments?since=$start" \
-            --jq "[.[] | select(.user.login == \"$bot\")] | length" | awk '{s+=$1} END {print s+0}')"
+            --jq "[.[] | select(.user.login == \"$bot\")] | length" | awk '{s+=$1} END {print s+0}' || true)"
           pushed=""
           if [ "$IS_PR" = "true" ]; then
             pushed="$(gh pr view "$NUMBER" --repo "$REPO" --json commits \
