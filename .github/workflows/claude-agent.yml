@@ -328,6 +328,9 @@ jobs:
           JOB_STATUS: ${{ job.status }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          # Without this, run: steps use plain `bash -e`, and a failed `gh api` in a
+          # pipeline (e.g. into awk) would go unnoticed.
+          set -o pipefail
           start="${AGENT_START:-}"
           bot='github-actions[bot]'
           # Only count PRs/issues whose body links this issue, so an overlapping
@@ -349,11 +352,11 @@ jobs:
           page=1
           while :; do
             if ! page_json="$(gh api "repos/$REPO/pulls?state=all&sort=created&direction=desc&per_page=100&page=$page")"; then
-              lookup_failed=1; prs=""; break
+              lookup_failed=1; break  # keep matches from earlier pages
             fi
             if ! matches="$(jq -r ".[] | select(.user.login == \"$bot\" and .created_at >= \"$start\" and ($refs)) | \"- PR #\(.number): \(.html_url)\"" <<< "$page_json")" \
               || ! last_page="$(jq "length < 100 or (last.created_at < \"$start\")" <<< "$page_json")"; then
-              lookup_failed=1; prs=""; break
+              lookup_failed=1; break
             fi
             [ -n "$matches" ] && prs="${prs:+$prs$'\n'}$matches"
             [ "$last_page" = "true" ] && break
