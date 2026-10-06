@@ -104,6 +104,10 @@ namespace Revoke
         CopyComponentIfExists<NativeScriptComponent>(copy, source);
         CopyComponentIfExists<SoundComponent>(copy, source);
 
+        // Duplicating the main camera would leave two entities claiming the role.
+        if (copy.HasComponent<CameraComponent>())
+            copy.GetComponent<CameraComponent>().isMain = false;
+
         // Runtime objects belong to the source; the copy gets its own or none.
         if (copy.HasComponent<RigidBodyComponent>())
             copy.GetComponent<RigidBodyComponent>().Body = nullptr;
