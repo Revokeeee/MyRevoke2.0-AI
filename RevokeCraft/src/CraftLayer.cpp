@@ -161,7 +161,16 @@ namespace Revoke
 		// The toolbar should stay a fixed strip, so size it in pixels rather than as a share of the window.
 		// Capped at half so a very short window still leaves room for the Viewport.
 		const float toolbarHeight = 32.0f;
-		float centerHeight = ImGui::DockBuilderGetNode(centerId)->Size.y;
+		ImGuiDockNode* centerNode = ImGui::DockBuilderGetNode(centerId);
+		RV_ASSERT(centerNode, "Default dock layout: Viewport node missing after split");
+		// RV_ASSERT compiles out in Release, so also bail out rather than crash. Return
+		// true so the caller doesn't retry a split that can never succeed.
+		if (!centerNode)
+		{
+			ImGui::DockBuilderFinish(dockspaceId);
+			return true;
+		}
+		float centerHeight = centerNode->Size.y;
 		float toolbarRatio = ImMin(toolbarHeight / centerHeight, 0.5f);
 		ImGuiID toolbarId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Up, toolbarRatio, nullptr, &centerId);
 
@@ -175,6 +184,9 @@ namespace Revoke
 		for (ImGuiID id : { toolbarId, centerId })
 		{
 			ImGuiDockNode* node = ImGui::DockBuilderGetNode(id);
+			RV_ASSERT(node, "Default dock layout: node missing after split");
+			if (!node)
+				continue;
 			node->SetLocalFlags(node->LocalFlags | ImGuiDockNodeFlags_HiddenTabBar);
 		}
 
