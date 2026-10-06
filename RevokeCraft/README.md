@@ -18,7 +18,7 @@ single `CraftLayer`, and implements the `Revoke::CreateApplication()` factory re
 | `ObjectsPannel.h`/`.cpp` *(sic — "Panel")* | "Scene Hierarchy" + "Properties" | Hierarchy: entities in creation order (`Scene::GetEntities`), search, create menu, inline rename (F2 / double-click), duplicate (Ctrl+D), delete (Del). Properties: one collapsible section per component (`DrawComponent<T>`) with Reset/Remove, and an "Add Component" menu |
 | `EditorUI.h`/`.cpp` | Shared widgets | Label/value property rows (`UI::Property*`), X/Y/Z fields, asset drop fields, search box, icon buttons, tooltips |
 | `AssetType.h` | — | Maps a file extension to an `AssetType` and its icon; the Content Browser drag-and-drop payload name |
-| `ContentBrowser.h`/`.cpp` | "Content Browser" | Icon grid over the open project's assets tree; drag-and-drop source for textures/audio/scripts |
+| `ContentBrowser.h`/`.cpp` | "Content Browser" | Grid of the open project's assets with breadcrumbs, recursive search, image thumbnails and typed icons; double-click opens folders and scenes; drag-and-drop source for the viewport and Properties fields |
 | `SceneSettingsPannel.h`/`.cpp` *(sic)* | "Scene Settings" | Clear color, blending toggle, physics iteration counts, "Build Scripts" (`msbuild` on `MyRevoke-NativeScriptCore`; not in `Dist` builds) |
 | `ToolBar.h`/`.cpp` | Gizmo tools (Q/W/E/R), local/world and snap toggles, Play/Stop (Ctrl+P) | Owns the gizmo state `CraftLayer` reads; calls back into `CraftLayer` to start/stop play mode |
 
@@ -38,8 +38,8 @@ The editor's own files live next to `RevokeCraft.exe` (the Premake `targetdir` f
 `RevokeCraft/` folder itself) and are opened through `GetExecutableDirectory()`, so the editor can be
 started from any working directory.
 
-- `resourses/` *(sic — "resources")*: `shaders/Main.shader` (the engine's renderer shader), `icons/`
-  for the content browser, and `scripts/Native` where the compiled
+- `resourses/` *(sic — "resources")*: `shaders/Main.shader` (the engine's renderer shader)
+  and `scripts/Native` where the compiled
   `MyRevoke-NativeScriptCore` DLL is hot-loaded from at runtime.
 - `mono/` — the Mono runtime distribution needed for embedded C# scripting.
 - `projects/Example/` — the example project (the old `assets/` content), opened on startup.

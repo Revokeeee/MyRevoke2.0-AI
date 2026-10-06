@@ -20,7 +20,8 @@ namespace Revoke::UI
 	void EmptyState(const char* icon, const char* text);
 
 	// Text box with a search icon and a clear button. Returns true when the text changed.
-	bool SearchBox(const char* id, std::string& text, const char* hint = "Search");
+	// width 0 fills the rest of the line.
+	bool SearchBox(const char* id, std::string& text, const char* hint = "Search", float width = 0.0f);
 
 	// Case-insensitive "does text contain filter". An empty filter matches everything.
 	bool MatchesFilter(const std::string& text, const std::string& filter);

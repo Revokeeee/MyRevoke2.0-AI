@@ -63,7 +63,7 @@ namespace Revoke::UI
 		ImGui::PopTextWrapPos();
 	}
 
-	bool SearchBox(const char* id, std::string& text, const char* hint)
+	bool SearchBox(const char* id, std::string& text, const char* hint, float width)
 	{
 		ImGui::PushID(id);
 
@@ -72,7 +72,7 @@ namespace Revoke::UI
 
 		const float spacing = ImGui::GetStyle().ItemInnerSpacing.x;
 		const float clearWidth = text.empty() ? 0.0f : ImGui::GetFrameHeight() + spacing;
-		ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - clearWidth);
+		ImGui::SetNextItemWidth((width > 0.0f ? width : ImGui::GetContentRegionAvail().x) - clearWidth);
 
 		std::string hintText = std::string(RV_ICON_SEARCH "  ") + hint;
 		bool changed = ImGui::InputTextWithHint("##search", hintText.c_str(), buffer, sizeof(buffer));
