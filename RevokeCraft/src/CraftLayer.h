@@ -54,6 +54,11 @@ namespace Revoke
 		void StopPlayingScene();
 		void SetPanelsScene(const Shared<Scene>& scene);
 
+		// Docks Viewport/Scene Hierarchy/Properties/Scene Settings/Content Browser into a
+		// sensible default layout. Only called when no layout has been saved yet, or from
+		// View > Reset Layout.
+		// Returns false if the window has no size yet (e.g. minimized) and nothing was built.
+		bool BuildDefaultDockLayout(ImGuiID dockspaceId);
 		std::string SerializeScene();
 		void MarkSceneSaved();
 		bool HasUnsavedChanges();
@@ -77,6 +82,7 @@ namespace Revoke
 		std::filesystem::path m_ScenePath;
 		bool m_ShowSavePrompt = false;
 		bool m_LastSaveFailed = false;
+		bool m_ResetLayoutRequested = false;
 
 		Entity m_CameraEntity;
 		Entity m_SecondCamera;

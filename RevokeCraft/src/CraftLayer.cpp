@@ -11,6 +11,7 @@
 #include "MyRevoke/Scripting/NativeScript.h"
 #include "MyRevoke/Core/Input.h"
 #include <ImGuizmo.h>
+#include <imgui_internal.h>
 
 namespace Revoke
 {
@@ -134,6 +135,65 @@ namespace Revoke
 
 	}
 
+	bool CraftLayer::BuildDefaultDockLayout(ImGuiID dockspaceId)
+	{
+		// A minimized window reports a zero size, which would make the splits below
+		// divide by zero. Skip it; the caller retries next frame.
+		ImVec2 viewportSize = ImGui::GetMainViewport()->Size;
+		if (viewportSize.x <= 0.0f || viewportSize.y <= 0.0f)
+			return false;
+
+		ImGui::DockBuilderRemoveNode(dockspaceId);
+		ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
+		ImGui::DockBuilderSetNodeSize(dockspaceId, viewportSize);
+
+		// Full-height right column (Scene Settings over Properties); the rest is
+		// Hierarchy | toolbar-over-Viewport, with the Content Browser below them.
+		ImGuiID mainId = dockspaceId;
+		ImGuiID rightId = ImGui::DockBuilderSplitNode(mainId, ImGuiDir_Right, 0.13f, nullptr, &mainId);
+		ImGuiID propertiesId = rightId;
+		ImGuiID settingsId = ImGui::DockBuilderSplitNode(propertiesId, ImGuiDir_Up, 0.22f, nullptr, &propertiesId);
+
+		ImGuiID centerId = mainId;
+		ImGuiID bottomId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Down, 0.21f, nullptr, &centerId);
+		ImGuiID leftId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Left, 0.21f, nullptr, &centerId);
+
+		// The toolbar should stay a fixed strip, so size it in pixels rather than as a share of the window.
+		// Capped at half so a very short window still leaves room for the Viewport.
+		const float toolbarHeight = 32.0f;
+		ImGuiDockNode* centerNode = ImGui::DockBuilderGetNode(centerId);
+		RV_ASSERT(centerNode, "Default dock layout: Viewport node missing after split");
+		// RV_ASSERT compiles out in Release, so also bail out rather than crash. Return
+		// true so the caller doesn't retry a split that can never succeed.
+		if (!centerNode)
+		{
+			ImGui::DockBuilderFinish(dockspaceId);
+			return true;
+		}
+		float centerHeight = centerNode->Size.y;
+		float toolbarRatio = ImMin(toolbarHeight / centerHeight, 0.5f);
+		ImGuiID toolbarId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Up, toolbarRatio, nullptr, &centerId);
+
+		ImGui::DockBuilderDockWindow("Scene Settings", settingsId);
+		ImGui::DockBuilderDockWindow("Properties", propertiesId);
+		ImGui::DockBuilderDockWindow("Content Browser", bottomId);
+		ImGui::DockBuilderDockWindow("Scene Hierarchy", leftId);
+		ImGui::DockBuilderDockWindow("##toolbar", toolbarId);
+		ImGui::DockBuilderDockWindow("Viewport", centerId);
+
+		for (ImGuiID id : { toolbarId, centerId })
+		{
+			ImGuiDockNode* node = ImGui::DockBuilderGetNode(id);
+			RV_ASSERT(node, "Default dock layout: node missing after split");
+			if (!node)
+				continue;
+			node->SetLocalFlags(node->LocalFlags | ImGuiDockNodeFlags_HiddenTabBar);
+		}
+
+		ImGui::DockBuilderFinish(dockspaceId);
+		return true;
+	}
+
 	void CraftLayer::OnImGuiDraw()
 	{
 		static bool dockspaceOpen = true;
@@ -165,9 +225,15 @@ namespace Revoke
 
 		// DockSpace
 		ImGuiIO& io = ImGui::GetIO();
+		ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
 		if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
 		{
-			ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
+			// Rebuild before DockSpace() submits the node this frame, never after it. If the
+			// build is skipped (zero-size window), keep the request: DockSpace() is about to
+			// create an empty node, so the "no node yet" check alone would never retry.
+			if (m_ResetLayoutRequested || ImGui::DockBuilderGetNode(dockspace_id) == nullptr)
+				m_ResetLayoutRequested = !BuildDefaultDockLayout(dockspace_id);
+
 			ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
 		}
 
@@ -182,10 +248,16 @@ namespace Revoke
 				if (ImGui::MenuItem("Open", "Ctrl+O")) OpenScene();
 				if (ImGui::MenuItem("Save", "Ctrl+S")) Save();
 				if (ImGui::MenuItem("Save as", "Ctrl+Shift+S")) SaveAs();
-	
+
 				ImGui::EndMenu();
 			}
-			
+
+			if (ImGui::BeginMenu("View"))
+			{
+				if (ImGui::MenuItem("Reset Layout")) m_ResetLayoutRequested = true;
+
+				ImGui::EndMenu();
+			}
 
 			ImGui::EndMenuBar();
 		}
