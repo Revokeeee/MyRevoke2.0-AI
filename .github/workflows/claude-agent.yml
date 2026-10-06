@@ -51,6 +51,12 @@ jobs:
         (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
       )
     runs-on: ubuntu-latest
+    # One agent run per issue/PR at a time; a second trigger queues instead
+    # of racing the first. Job-level so ordinary comments, which skip the job,
+    # never enter the group and bump a queued run.
+    concurrency:
+      group: claude-agent-${{ github.event.issue.number }}
+      cancel-in-progress: false
     steps:
       - name: Pick model from issue labels
         id: pick-model
@@ -143,6 +149,7 @@ jobs:
                version. Keep it short: read `.github/WRITING_STYLE.md` first
                and follow its limits (the whole body under 150 words).
                - Summary: what changed and why, 3 sentences max, link the issue
+                 as `#${{ github.event.issue.number }}` (the job checks for it)
                - Checklist: tick honestly. For tests, one line on how you
                  verified it. Tick "needs close human review" if the change
                  involves a structural decision or anything you are unsure of.
@@ -155,7 +162,8 @@ jobs:
             said in a comment on some other issue or PR. Create them directly
             with `gh issue create`. Give each a clear, specific title and a
             body with real context: what the work is, why it's needed, where
-            it came from (link the issue/PR that prompted it), and concrete
+            it came from (write `#${{ github.event.issue.number }}` in the body;
+            the job checks for it), and concrete
             acceptance criteria where you can state them.
 
             Every issue title starts with one or more area tags in square
@@ -320,11 +328,14 @@ jobs:
         run: |
           start="${AGENT_START:-1970-01-01T00:00:00Z}"
           bot='github-actions[bot]'
+          # Only count PRs/issues whose body links this issue, so an overlapping
+          # agent run on another issue can't be mistaken for this run's output.
+          refs="(.body // \"\") | test(\"#$NUMBER([^0-9]|$)\")"
 
           prs="$(gh api "repos/$REPO/pulls?state=all&sort=created&direction=desc&per_page=50" \
-            --jq ".[] | select(.user.login == \"$bot\" and .created_at >= \"$start\") | \"- PR #\(.number): \(.html_url)\"" || true)"
+            --jq ".[] | select(.user.login == \"$bot\" and .created_at >= \"$start\" and ($refs)) | \"- PR #\(.number): \(.html_url)\"" || true)"
           issues="$(gh api "repos/$REPO/issues?state=all&creator=github-actions%5Bbot%5D&since=$start&per_page=50" \
-            --jq ".[] | select(.pull_request == null and .created_at >= \"$start\") | \"- Issue #\(.number): \(.html_url)\"" || true)"
+            --jq ".[] | select(.pull_request == null and .created_at >= \"$start\" and ($refs)) | \"- Issue #\(.number): \(.html_url)\"" || true)"
           comments="$(gh api --paginate "repos/$REPO/issues/$NUMBER/comments?since=$start" \
             --jq "[.[] | select(.user.login == \"$bot\")] | length" | awk '{s+=$1} END {print s+0}')"
           pushed=""
