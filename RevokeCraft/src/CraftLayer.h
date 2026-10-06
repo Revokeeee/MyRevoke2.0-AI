@@ -51,6 +51,7 @@ namespace Revoke
 		std::string SerializeScene();
 		void MarkSceneSaved();
 		bool HasUnsavedChanges();
+		void WriteScene(const std::filesystem::path& file);
 		bool SaveBeforeClosing();
 		void DrawSavePrompt();
 

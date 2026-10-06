@@ -456,16 +456,19 @@ namespace Revoke
 		if (path.empty())
 			return false;
 
-		Serializer sceneSerializer(m_Scene, GetAssetsDirectory());
-		sceneSerializer.Serealize(path+".myrevoke");
-
-		m_ScenePath = path + ".myrevoke";
-		MarkSceneSaved();
+		WriteScene(path + ".myrevoke");
 		return true;
 	}
 
 	bool CraftLayer::Save()
 	{
+		// A scene that came from, or was already saved to, a file goes back to that file.
+		if (!m_ScenePath.empty())
+		{
+			WriteScene(m_ScenePath);
+			return true;
+		}
+
 		if (!m_Project)
 		{
 			RV_EDITOR_ERROR("No project open - use Save as to pick a file");
@@ -475,13 +478,17 @@ namespace Revoke
 		std::filesystem::path scenesDirectory = m_Project->GetScenesDirectory();
 		std::filesystem::create_directories(scenesDirectory);
 
-		std::filesystem::path file = scenesDirectory / (m_Scene->GetName() + ".myrevoke");
+		WriteScene(scenesDirectory / (m_Scene->GetName() + ".myrevoke"));
+		return true;
+	}
+
+	void CraftLayer::WriteScene(const std::filesystem::path& file)
+	{
 		Serializer sceneSerializer(m_Scene, GetAssetsDirectory());
 		sceneSerializer.Serealize(file.string());
 
 		m_ScenePath = file;
 		MarkSceneSaved();
-		return true;
 	}
 
 	std::string CraftLayer::SerializeScene()
@@ -504,13 +511,7 @@ namespace Revoke
 	// overwrite a file that happens to share the scene's name).
 	bool CraftLayer::SaveBeforeClosing()
 	{
-		if (m_ScenePath.empty())
-			return SaveAs();
-
-		Serializer sceneSerializer(m_Scene, GetAssetsDirectory());
-		sceneSerializer.Serealize(m_ScenePath.string());
-		MarkSceneSaved();
-		return true;
+		return m_ScenePath.empty() ? SaveAs() : Save();
 	}
 
 	bool CraftLayer::OnCloseRequested()
