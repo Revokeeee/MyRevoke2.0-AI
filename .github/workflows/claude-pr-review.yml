@@ -1,45 +1,103 @@
 name: Claude PR Review
 
-# Automatically review every PR with Claude
+# Automatically review every PR with Claude, verify each finding, and fix the
+# confirmed ones on the PR branch. Every finding is still reported in one
+# review comment: what was fixed (with the commit) and what was left for a
+# human.
 #
-# Triggered on: pull_request (opened, synchronize, reopened)
-# Requires: ANTHROPIC_API_KEY repository secret
+# Triggered on:
+#   - pull_request (opened, synchronize, reopened): review + fix.
+#   - workflow_dispatch: this workflow dispatches itself with fix=false after
+#     it pushes a fix, so the fix commit gets its own required claude-review
+#     check. That re-run only reviews, so review -> fix -> review can't loop.
+#
+# Requires: ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN repository secret
 
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: PR number to review
+        required: true
+        type: string
+      fix:
+        description: Push fixes for confirmed findings
+        required: false
+        default: false
+        type: boolean
 
 permissions:
-  contents: read
+  # Push fix commits to the PR branch.
+  contents: write
   pull-requests: write
+  # Dispatch build.yml and this workflow on the fix commit (see below).
+  actions: write
 
 # Cancel an in-progress review for this PR when new commits arrive, so
 # rapid pushes don't queue up multiple paid reviews or post stale feedback
-# after a newer run has already started.
+# after a newer run has already started. The event name keeps the
+# self-dispatched re-review from cancelling the run that dispatched it.
 concurrency:
-  group: claude-pr-review-${{ github.event.pull_request.number }}
+  group: claude-pr-review-${{ github.event.pull_request.number || inputs.pr_number }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
+  # Keep the job named claude-review: main's branch protection requires it.
   claude-review:
     # Secrets are withheld from pull_request runs triggered by forks and by
     # Dependabot, so ANTHROPIC_API_KEY would be empty and this job would
     # fail rather than just skip. Guard explicitly instead of showing a red
     # X on every external/Dependabot PR. This repo doesn't expect outside
-    # contributions right now; revisit if that changes.
+    # contributions right now; revisit if that changes. workflow_dispatch
+    # needs write access to start, and the PR is checked for forks below.
     if: >
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.actor != 'dependabot[bot]'
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+       github.actor != 'dependabot[bot]')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo (with submodules)
+      - name: Resolve PR and mode
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          FIX: ${{ github.event_name == 'pull_request' || inputs.fix }}
+        run: |
+          pr_json="$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefName,isCrossRepository)"
+          branch="$(jq -r .headRefName <<< "$pr_json")"
+          if [ "$(jq -r .isCrossRepository <<< "$pr_json")" != "false" ]; then
+            echo "::error::PR #$PR_NUMBER is from a fork; not reviewing it with repo secrets."
+            exit 1
+          fi
+          # Review-only runs never get the tools to edit or push.
+          tools="Read,Write,Grep,Glob,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr review:*)"
+          if [ "$FIX" = "true" ]; then
+            tools="$tools,Edit,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(git rev-parse:*)"
+          fi
+          {
+            echo "number=$PR_NUMBER"
+            echo "branch=$branch"
+            echo "fix=$FIX"
+            echo "tools=$tools"
+          } >> "$GITHUB_OUTPUT"
+
+      # Check out the PR branch itself, not the merge commit, so fixes can
+      # be committed and pushed straight back to it.
+      - name: Checkout PR branch (with submodules)
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ steps.pr.outputs.branch }}
           fetch-depth: 0
           submodules: recursive
 
-      - name: Record review start time
-        run: echo "REVIEW_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+      - name: Record review start time and commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          echo "REVIEW_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+          echo "HEAD_BEFORE=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Claude Code Review
         id: review
@@ -61,16 +119,27 @@ jobs:
           # claude-review check fails on every agent PR. Only this one bot:
           # the job's `if:` already excludes forks, and github-actions[bot]
           # PRs here come only from this repo's own owner-gated workflows.
+          # The self-dispatched re-review also runs as this bot.
           allowed_bots: "github-actions[bot]"
           # Headless CI has no one to approve tool use, so without an explicit
           # grant every attempt to post the review is denied and the job still
           # "succeeds" having posted nothing. This reads PR content written by
           # an agent, so it gets a narrow allowlist rather than bypassPermissions:
-          # read the code, and the few gh pr commands a review needs.
+          # read the code, the few gh pr commands a review needs and, in fix
+          # mode only, edit + the git commands to commit and push.
           claude_args: >-
-            --allowedTools "Read,Write,Grep,Glob,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr review:*)"
+            --allowedTools "${{ steps.pr.outputs.tools }}"
           prompt: |
-            Review PR #${{ github.event.pull_request.number }} for the MyRevoke C++ game engine.
+            Review PR #${{ steps.pr.outputs.number }} for the MyRevoke C++ game engine.
+            The PR branch `${{ steps.pr.outputs.branch }}` is checked out.
+
+            Fix mode: ${{ steps.pr.outputs.fix == 'true' && 'ON' || 'OFF (review only - do not edit, commit or push anything)' }}
+
+            ## 1. Find candidate issues
+
+            Read `gh pr diff ${{ steps.pr.outputs.number }}` and
+            `gh pr view ${{ steps.pr.outputs.number }}`. If the PR body has a
+            **Notes for AI review** section, honour it.
 
             Focus on:
             - Correctness: Does the code do what it intends? Any crashes, null-pointer bugs, UB?
@@ -79,22 +148,71 @@ jobs:
             - Performance: Allocations in tight loops? O(n²) where it shouldn't be?
             - Style: Matches the codebase patterns (naming, error handling, smart pointers)?
 
-            Keep it short, per `.github/WRITING_STYLE.md`: one bullet per
-            finding - `file:line`, the problem, the fix. No intro, no closing
-            summary, no praise.
+            ## 2. Verify every candidate before keeping it
 
-            Post the review with exactly one
-            `gh pr review ${{ github.event.pull_request.number }} --comment --body-file <file>`
+            Treat each candidate as a claim to disprove. For each one:
+            - Re-read the code around it, not just the diff hunk: callers,
+              the types involved, and anything that already guards the case.
+            - Write down the concrete failure: what input or state triggers it
+              and what goes wrong. If you can't, drop it.
+            - Check it is caused or touched by this PR, not pre-existing code
+              the PR doesn't change.
+            Drop anything that doesn't survive. Only confirmed findings go any
+            further.
+
+            ## 3. Decide whether to fix (fix mode only)
+
+            Fix a confirmed finding only if all of these hold:
+            - The fix is small and local, and you are confident it is correct.
+            - It doesn't change a public interface, the scene/serialization
+              format, or anything else other code depends on.
+            - It isn't a design or architecture call, or a matter of taste
+              (style and performance findings are usually comment-only).
+            - It isn't under `.github/workflows/` (this token can't push those).
+            Everything else is reported, not fixed.
+
+            Then for each fix: make the smallest change that resolves the
+            failure, read your `git diff` back, and check the failure scenario
+            no longer happens and no caller breaks. You can't build here
+            (Windows/MSVC project); the build re-runs on your commit, so be
+            conservative. If the re-check fails, revert that fix and report the
+            finding instead.
+
+            Commit all fixes as one commit (message: `Fix review findings`
+            plus one line per fix) and push with
+            `git push origin HEAD:${{ steps.pr.outputs.branch }}`. Never
+            force-push, never open a PR, never push an empty commit. If the push
+            is rejected, don't retry: report those findings as not fixed and
+            say the push failed.
+
+            ## 4. Post one review
+
+            Keep it short, per `.github/WRITING_STYLE.md`. Format:
+
+            ```
+            <verdict line>
+
+            Fixed in <short sha>:
+            - `file:line` problem -> what changed
+
+            Not fixed:
+            - `file:line` problem, then the suggested fix. (Why not auto-fixed, a few words.)
+            ```
+
+            Verdict line: "No issues found.", or "N issues found, M fixed.".
+            Omit a section that would be empty. No intro, no closing summary,
+            no praise, nothing about dropped candidates.
+
+            Post it with exactly one
+            `gh pr review ${{ steps.pr.outputs.number }} --comment --body-file <file>`
             (write the body to a file first to avoid shell quoting problems).
             Always use --comment, never --approve or --request-changes: agent
             PRs are authored by the same bot account you run as, and GitHub
-            rejects approving or requesting changes on your own PR. Start the
-            body with a one-line verdict ("No issues found." or "N issues
-            found."), so it's clear the review ran even when it's short.
+            rejects approving or requesting changes on your own PR.
 
             After posting, write the file `${{ runner.temp }}/review-verdict.txt`
-            containing exactly `PASS` if you found no issues, or `FAIL` if you
-            found one or more. The next step reads it to fail the check.
+            containing exactly `PASS` if no confirmed issue is left unfixed, or
+            `FAIL` if one or more is. The next step reads it to fail the check.
 
       # `gh pr review --comment` can't block a PR, so the job would otherwise
       # be green even with findings. Fail it here instead; a missing or
@@ -117,9 +235,30 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # --paginate runs --jq once per page, so emit one line per match and count lines.
-          count="$(gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews" \
+          count="$(gh api --paginate "repos/${{ github.repository }}/pulls/${{ steps.pr.outputs.number }}/reviews" \
             --jq ".[] | select(.user.login == \"github-actions[bot]\" and .submitted_at >= \"$REVIEW_START\") | .id" | wc -l)"
           if [ "${count:-0}" -lt 1 ]; then
             echo "::error::No review from github-actions[bot] was posted during this run."
             exit 1
           fi
+
+      # Pushes made with GITHUB_TOKEN never trigger pull_request workflows,
+      # so the fix commit would sit with its required checks ("build (Debug)",
+      # "build (Release)", "claude-review") waiting forever. workflow_dispatch
+      # is exempt from that rule: start the build and a review-only re-review
+      # on the new head. The re-review also double-checks the fix itself.
+      - name: Re-run checks on the fix commit
+        if: always() && steps.review.conclusion == 'success' && steps.pr.outputs.fix == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ steps.pr.outputs.branch }}
+        run: |
+          git fetch --quiet origin "$BRANCH"
+          head="$(git rev-parse HEAD)"
+          if [ "$head" = "$HEAD_BEFORE" ] || [ "$head" != "$(git rev-parse FETCH_HEAD)" ]; then
+            echo "No fix commit was pushed; nothing to re-run."
+            exit 0
+          fi
+          gh workflow run build.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH"
+          gh workflow run claude-pr-review.yml --repo "$GITHUB_REPOSITORY" --ref "$BRANCH" \
+            -f pr_number="${{ steps.pr.outputs.number }}" -f fix=false
