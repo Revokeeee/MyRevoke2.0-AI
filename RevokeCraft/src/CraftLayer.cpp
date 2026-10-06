@@ -12,6 +12,8 @@
 #include "MyRevoke/Core/Input.h"
 #include <ImGuizmo.h>
 #include <imgui_internal.h>
+#include "MyRevoke/ImGui/ImGuiTheme.h"
+#include "MyRevoke/ImGui/ImGuiLayer.h"
 
 namespace Revoke
 {
@@ -60,10 +62,6 @@ namespace Revoke
 		SetPanelsScene(m_Scene);
 		m_ToolBar.SetPlayCallbacks([this]() { OnScenePlay(); }, [this]() { OnSceneStop(); });
 
-		m_GizmoType = new int(-1);
-
-		m_ToolBar.SetGuizmo(m_GizmoType);
-
 		RendererAPI::SetClearColor({ 0.2f, 0.2f, 0.2f, 1.0f });
 		RendererAPI::EnableBlending();
 
@@ -72,7 +70,6 @@ namespace Revoke
 	}
 	void CraftLayer::OnDetach()
 	{
-		delete m_GizmoType;
 	}
 	void CraftLayer::OnUpdate(Timestep deltaTime)
 	{
@@ -160,7 +157,7 @@ namespace Revoke
 
 		// The toolbar should stay a fixed strip, so size it in pixels rather than as a share of the window.
 		// Capped at half so a very short window still leaves room for the Viewport.
-		const float toolbarHeight = 32.0f;
+		const float toolbarHeight = 36.0f * ImGuiLayer::GetUIScale();
 		ImGuiDockNode* centerNode = ImGui::DockBuilderGetNode(centerId);
 		RV_ASSERT(centerNode, "Default dock layout: Viewport node missing after split");
 		// RV_ASSERT compiles out in Release, so also bail out rather than crash. Return
@@ -312,31 +309,50 @@ namespace Revoke
 		}
 		
 
+		// While playing, the viewport shows the scene's own camera, so a gizmo placed with the
+		// editor camera's matrices would not line up with anything. Outline the viewport instead,
+		// so play mode is obvious at a glance.
+		const bool playing = m_ToolBar.GetSceneState() == SceneState::Runtime;
+		if (playing)
+		{
+			ImGui::GetWindowDrawList()->AddRect(ImVec2(m_ViewportBounds[0].x, m_ViewportBounds[0].y), ImVec2(m_ViewportBounds[1].x, m_ViewportBounds[1].y),
+				ImGui::GetColorU32(Theme::Accent), 0.0f, 0, 2.0f * ImGuiLayer::GetUIScale());
+		}
+
 		//-----------Guizmo---------------------------------------------------
-		if (selectedEntity && *m_GizmoType != -1)
+		ImGuizmo::OPERATION gizmoOperation = ImGuizmo::TRANSLATE;
+		switch (m_ToolBar.GetGizmoTool())
+		{
+		case GizmoTool::Translate: gizmoOperation = ImGuizmo::TRANSLATE; break;
+		case GizmoTool::Rotate:    gizmoOperation = ImGuizmo::ROTATE; break;
+		case GizmoTool::Scale:     gizmoOperation = ImGuizmo::SCALE; break;
+		default: break;
+		}
+
+		if (selectedEntity && !playing && m_ToolBar.GetGizmoTool() != GizmoTool::Select)
 		{
 			ImGuizmo::SetOrthographic(false);
 			ImGuizmo::SetDrawlist();
 
 			ImGuizmo::SetRect(m_ViewportBounds[0].x, m_ViewportBounds[0].y, m_ViewportBounds[1].x - m_ViewportBounds[0].x, m_ViewportBounds[1].y - m_ViewportBounds[0].y);
 
-
-			auto mainCameraEntt = m_EditorCamera;
 			const glm::mat4& cameraProjection = m_EditorCamera.GetProjectionMatrix();
 			glm::mat4 cameraView = m_EditorCamera.GetViewMatrix();
 
 			auto& entityTransformsComponent = selectedEntity.GetComponent<TransformComponent>();
 			glm::mat4 tranforms = entityTransformsComponent.GetTransform();
-			
-			bool snap = Input::IsKeyPressed(RV_KEY_LEFT_CONTROL);
+
+			// The toolbar toggle turns snapping on; Ctrl flips it either way.
+			bool ctrlHeld = Input::IsKeyPressed(RV_KEY_LEFT_CONTROL) || Input::IsKeyPressed(RV_KEY_RIGHT_CONTROL);
+			bool snap = m_ToolBar.IsSnapEnabled() != ctrlHeld;
 			float snapValue = 0.5f;
-			if (*m_GizmoType == ImGuizmo::OPERATION::ROTATE)
+			if (gizmoOperation == ImGuizmo::ROTATE)
 				snapValue = 45.0f;
 
 			float snapValues[3] = { snapValue, snapValue, snapValue };
 
-		
-			ImGuizmo::Manipulate(glm::value_ptr(cameraView), glm::value_ptr(cameraProjection), (ImGuizmo::OPERATION)*m_GizmoType, ImGuizmo::LOCAL, glm::value_ptr(tranforms), nullptr, snap ? snapValues : nullptr);
+			ImGuizmo::MODE gizmoMode = m_ToolBar.IsGizmoLocal() ? ImGuizmo::LOCAL : ImGuizmo::WORLD;
+			ImGuizmo::Manipulate(glm::value_ptr(cameraView), glm::value_ptr(cameraProjection), gizmoOperation, gizmoMode, glm::value_ptr(tranforms), nullptr, snap ? snapValues : nullptr);
 
 			if (ImGuizmo::IsUsing() && !Input::IsKeyPressed(RV_KEY_LEFT_ALT))
 			{
@@ -350,11 +366,10 @@ namespace Revoke
 			}
 		}
 
-
-		m_ToolBar.OnImGuiRender();
-
 		ImGui::End();
 		ImGui::PopStyleVar();
+
+		m_ToolBar.OnImGuiRender();
 
 		ImGui::End();
 	}
@@ -381,54 +396,64 @@ namespace Revoke
 	}
 	bool CraftLayer::OnKeyPressed(KeyPressedEvent& e)
 	{
+		// A held key repeats; a shortcut should fire once. And while a text field has focus the
+		// keys are text: typing "w" into a name must not switch the gizmo.
+		if (e.GetRepeatCount() > 0 || ImGui::GetIO().WantTextInput)
+			return false;
+
+		const bool ctrl = Input::IsKeyPressed(RV_KEY_LEFT_CONTROL) || Input::IsKeyPressed(RV_KEY_RIGHT_CONTROL);
+		const bool shift = Input::IsKeyPressed(RV_KEY_LEFT_SHIFT) || Input::IsKeyPressed(RV_KEY_RIGHT_SHIFT);
+
 		switch (e.GetKeyCode())
 		{
 		case RV_KEY_S:
 		{
-			if (Input::IsKeyPressed(RV_KEY_LEFT_CONTROL) && Input::IsKeyPressed(RV_KEY_LEFT_SHIFT))
-			{
+			if (ctrl && shift)
 				SaveAs();
-			}
-			else if (Input::IsKeyPressed(RV_KEY_LEFT_CONTROL))
-			{
+			else if (ctrl)
 				Save();
-			}
 			break;
 		}
 		case RV_KEY_N:
 		{
-			if (Input::IsKeyPressed(RV_KEY_LEFT_CONTROL))
-			{
+			if (ctrl)
 				NewScene();
-			}
 			break;
 		}
 		case RV_KEY_O:
 		{
-			if (Input::IsKeyPressed(RV_KEY_LEFT_CONTROL))
-			{
+			if (ctrl)
 				OpenScene();
-			}
+			break;
+		}
+		case RV_KEY_P:
+		{
+			if (ctrl)
+				m_ToolBar.TogglePlay();
 			break;
 		}
 		case RV_KEY_Q:
 		{
-			*m_GizmoType = -1;
+			if (!ctrl)
+				m_ToolBar.SetGizmoTool(GizmoTool::Select);
 			break;
 		}
 		case RV_KEY_W:
 		{
-			*m_GizmoType = ImGuizmo::OPERATION::TRANSLATE;
+			if (!ctrl)
+				m_ToolBar.SetGizmoTool(GizmoTool::Translate);
 			break;
 		}
 		case RV_KEY_E:
 		{
-			*m_GizmoType = ImGuizmo::OPERATION::ROTATE;
+			if (!ctrl)
+				m_ToolBar.SetGizmoTool(GizmoTool::Rotate);
 			break;
 		}
 		case RV_KEY_R:
 		{
-			*m_GizmoType = ImGuizmo::OPERATION::SCALE;
+			if (!ctrl)
+				m_ToolBar.SetGizmoTool(GizmoTool::Scale);
 			break;
 		}
 		}
