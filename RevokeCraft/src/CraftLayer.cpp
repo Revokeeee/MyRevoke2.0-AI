@@ -456,6 +456,19 @@ namespace Revoke
 				m_ToolBar.SetGizmoTool(GizmoTool::Scale);
 			break;
 		}
+		// The hierarchy handles these itself while it has focus; here they cover the viewport.
+		case RV_KEY_DELETE:
+		{
+			if (m_ViewportFocused)
+				m_ObjPannel.DeleteSelectedEntity();
+			break;
+		}
+		case RV_KEY_D:
+		{
+			if (ctrl && m_ViewportFocused)
+				m_ObjPannel.DuplicateSelectedEntity();
+			break;
+		}
 		}
 		return false;
 	}

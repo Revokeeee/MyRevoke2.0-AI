@@ -129,75 +129,233 @@ namespace Revoke
 	{
 		m_CurrentScene = currentScene;
 		m_SelectedEntity = {};
+		m_RenamingEntity = {};
+		m_PendingDelete = {};
 	}
 
 	void ObjectsPannel::OnImGuiRender()
 	{
-		ImGui::Begin("Scene Hierarchy");
-		if (m_CurrentScene)
-		{
-			m_CurrentScene->m_Registry.each([&](auto entityID)
-				{
-					Entity entity{ entityID , m_CurrentScene.get() };
-					SceneHierarchyWindow(entity);
-				});
-			if (ImGui::IsMouseDown(0) && ImGui::IsWindowHovered())
-				m_SelectedEntity = {};
-
-			if (ImGui::BeginPopupContextWindow(0, 1 | ImGuiPopupFlags_NoOpenOverItems))
-			{
-				if (ImGui::MenuItem("Create Entity"))
-				{
-					m_CurrentScene->CreateEntity("Empty Entity");
-				}
-				ImGui::EndPopup();
-			}
-
-		}
-
-		ImGui::End();
+		HierarchyWindow();
 
 		ImGui::Begin("Properties");
 		PropertiesWindow();
 		ImGui::End();
 	}
-	void ObjectsPannel::SceneHierarchyWindow(Entity entity)
+
+	void ObjectsPannel::HierarchyWindow()
 	{
-				bool entityExist = true;
-				auto& entityName = entity.GetComponent<NameComponent>().Name;
-				ImGuiTreeNodeFlags flags = ((m_SelectedEntity == entity) ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_OpenOnArrow;
-				flags |= ImGuiTreeNodeFlags_SpanAvailWidth;
+		ImGui::Begin("Scene Hierarchy");
+		if (!m_CurrentScene)
+		{
+			UI::EmptyState(RV_ICON_LAYERS, "No scene open.");
+			ImGui::End();
+			return;
+		}
 
-				bool opened = ImGui::TreeNodeEx((void*)(uint64_t)(uint32_t)entity, flags, entityName.c_str());
-				if (ImGui::IsItemClicked())
-				{
-					m_SelectedEntity = entity;
-				}
+		// Create button and search
+		if (UI::IconButton(RV_ICON_ADD, "Create entity"))
+			ImGui::OpenPopup("CreateEntity");
+		if (ImGui::BeginPopup("CreateEntity"))
+		{
+			DrawCreateEntityMenu();
+			ImGui::EndPopup();
+		}
+		ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+		UI::SearchBox("HierarchySearch", m_HierarchyFilter, "Search entities");
 
-				if (ImGui::BeginPopupContextItem())
-				{
-					if (ImGui::MenuItem("Delete Entity"))
-					{
-						entityExist = false;
-					}
-					ImGui::EndPopup();
-				}
+		std::vector<Entity> entities = m_CurrentScene->GetEntities();
+		std::vector<Entity> visible;
+		visible.reserve(entities.size());
+		for (Entity entity : entities)
+		{
+			if (UI::MatchesFilter(entity.GetComponent<NameComponent>().Name, m_HierarchyFilter))
+				visible.push_back(entity);
+		}
 
-				if (opened)
-				{
-					ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_SpanAvailWidth;
-					bool opened = ImGui::TreeNodeEx((void*)9817239, flags, entityName.c_str());
-					if (opened)
-						ImGui::TreePop();
-					ImGui::TreePop();
-				}
-				if (!entityExist)
-				{
-					m_CurrentScene->RemoveEntity(entity);
-					if (m_SelectedEntity == entity)
-						m_SelectedEntity = {};
-				}
+		// The list scrolls; the entity count below it stays put.
+		const float footerHeight = ImGui::GetTextLineHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y;
+		ImGui::BeginChild("##entities", ImVec2(0.0f, -footerHeight));
 
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, 1.0f));
+		for (Entity entity : visible)
+			DrawEntityRow(entity);
+		ImGui::PopStyleVar();
+
+		if (entities.empty())
+			UI::EmptyState(RV_ICON_CUBE, "No entities yet. Right-click here or press + to create one.");
+		else if (visible.empty())
+			UI::EmptyState(RV_ICON_SEARCH, "No entity matches the search.");
+
+		// A click on empty space clears the selection; a right click there offers to create.
+		if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered())
+			m_SelectedEntity = {};
+		if (ImGui::BeginPopupContextWindow("HierarchyContext", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
+		{
+			DrawCreateEntityMenu();
+			ImGui::EndPopup();
+		}
+
+		ImGui::EndChild();
+
+		ImGui::PushStyleColor(ImGuiCol_Text, Theme::TextDisabled);
+		if (m_HierarchyFilter.empty())
+			ImGui::Text("%d %s", (int)entities.size(), entities.size() == 1 ? "entity" : "entities");
+		else
+			ImGui::Text("%d of %d entities", (int)visible.size(), (int)entities.size());
+		ImGui::PopStyleColor();
+
+		// Keyboard, while the hierarchy has focus and no text field is taking the keys.
+		if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !ImGui::GetIO().WantTextInput)
+		{
+			if (ImGui::IsKeyPressed(ImGuiKey_Delete, false))
+				DeleteSelectedEntity();
+			if (ImGui::IsKeyPressed(ImGuiKey_F2, false))
+				RenameSelectedEntity();
+			if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_D, false))
+				DuplicateSelectedEntity();
+
+			// Up / Down walk the visible list.
+			int step = ImGui::IsKeyPressed(ImGuiKey_DownArrow) ? 1 : ImGui::IsKeyPressed(ImGuiKey_UpArrow) ? -1 : 0;
+			if (step != 0 && !visible.empty())
+			{
+				auto it = std::find(visible.begin(), visible.end(), m_SelectedEntity);
+				int index = it == visible.end() ? (step > 0 ? -1 : (int)visible.size()) : (int)(it - visible.begin());
+				index = std::clamp(index + step, 0, (int)visible.size() - 1);
+				m_SelectedEntity = visible[index];
+			}
+		}
+
+		// Deleting inside the loop would pull the entity out from under the rows still being drawn.
+		if (m_PendingDelete)
+		{
+			if (m_SelectedEntity == m_PendingDelete)
+				m_SelectedEntity = {};
+			if (m_RenamingEntity == m_PendingDelete)
+				m_RenamingEntity = {};
+			m_CurrentScene->RemoveEntity(m_PendingDelete);
+			m_PendingDelete = {};
+		}
+
+		ImGui::End();
+	}
+
+	void ObjectsPannel::DrawEntityRow(Entity entity)
+	{
+		auto& name = entity.GetComponent<NameComponent>().Name;
+		ImGui::PushID((int)(uint32_t)entity);
+
+		if (m_RenamingEntity == entity)
+		{
+			if (m_FocusRename)
+			{
+				ImGui::SetKeyboardFocusHere();
+				m_FocusRename = false;
+			}
+			ImGui::SetNextItemWidth(-FLT_MIN);
+			ImGui::InputText("##rename", m_RenameBuffer, sizeof(m_RenameBuffer), ImGuiInputTextFlags_AutoSelectAll);
+
+			// Enter or clicking away keeps the new name; Escape keeps the old one.
+			if (ImGui::IsItemDeactivated())
+			{
+				if (!ImGui::IsKeyPressed(ImGuiKey_Escape) && m_RenameBuffer[0] != '\0')
+					name = m_RenameBuffer;
+				m_RenamingEntity = {};
+			}
+			ImGui::PopID();
+			return;
+		}
+
+		const char* icon = RV_ICON_CUBE;
+		if (entity.HasComponent<CameraComponent>())
+			icon = RV_ICON_CAMERA;
+		else if (entity.HasComponent<SpriteRendererComponent>())
+			icon = RV_ICON_IMAGE;
+		else if (entity.HasComponent<SoundComponent>())
+			icon = RV_ICON_VOLUME;
+
+		const bool selected = m_SelectedEntity == entity;
+		if (selected)
+		{
+			ImGui::PushStyleColor(ImGuiCol_Header, Theme::Selection);
+			ImGui::PushStyleColor(ImGuiCol_HeaderHovered, Theme::SelectionHovered);
+			ImGui::PushStyleColor(ImGuiCol_HeaderActive, Theme::SelectionHovered);
+		}
+		if (ImGui::Selectable("##row", selected, ImGuiSelectableFlags_AllowDoubleClick, ImVec2(0.0f, ImGui::GetFrameHeight())))
+		{
+			m_SelectedEntity = entity;
+			if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+				RenameSelectedEntity();
+		}
+		if (selected)
+			ImGui::PopStyleColor(3);
+
+		// Icon and name drawn over the row, so the icon can be muted.
+		ImVec2 rowMin = ImGui::GetItemRectMin();
+		float textY = rowMin.y + (ImGui::GetItemRectSize().y - ImGui::GetFontSize()) * 0.5f;
+		float textX = rowMin.x + ImGui::GetStyle().FramePadding.x;
+		ImDrawList* drawList = ImGui::GetWindowDrawList();
+		drawList->AddText(ImVec2(textX, textY), ImGui::GetColorU32(selected ? Theme::AccentHovered : Theme::TextMuted), icon);
+		textX += ImGui::CalcTextSize(icon).x + ImGui::GetStyle().ItemInnerSpacing.x * 1.5f;
+		drawList->AddText(ImVec2(textX, textY), ImGui::GetColorU32(ImGuiCol_Text), name.c_str());
+
+		if (ImGui::BeginPopupContextItem("EntityContext"))
+		{
+			m_SelectedEntity = entity;
+			if (ImGui::MenuItem(RV_ICON_PENCIL "  Rename", "F2"))
+				RenameSelectedEntity();
+			if (ImGui::MenuItem(RV_ICON_COPY "  Duplicate", "Ctrl+D"))
+				DuplicateSelectedEntity();
+			ImGui::Separator();
+			if (ImGui::MenuItem(RV_ICON_DELETE "  Delete", "Del"))
+				m_PendingDelete = entity;
+			ImGui::EndPopup();
+		}
+
+		ImGui::PopID();
+	}
+
+	void ObjectsPannel::DrawCreateEntityMenu()
+	{
+		if (ImGui::MenuItem(RV_ICON_CUBE "  Empty Entity"))
+			m_SelectedEntity = m_CurrentScene->CreateEntity("Entity");
+
+		if (ImGui::MenuItem(RV_ICON_IMAGE "  Sprite"))
+		{
+			Entity entity = m_CurrentScene->CreateEntity("Sprite");
+			entity.AddComponent<SpriteRendererComponent>();
+			m_SelectedEntity = entity;
+		}
+
+		if (ImGui::MenuItem(RV_ICON_CAMERA "  Camera"))
+		{
+			// Only the first camera in a scene starts out as the one play mode renders through.
+			bool hasPrimary = (bool)m_CurrentScene->GetMainCamera();
+			Entity entity = m_CurrentScene->CreateEntity("Camera");
+			entity.AddComponent<CameraComponent>().isMain = !hasPrimary;
+			m_SelectedEntity = entity;
+		}
+	}
+
+	void ObjectsPannel::DeleteSelectedEntity()
+	{
+		if (m_SelectedEntity)
+			m_PendingDelete = m_SelectedEntity;
+	}
+
+	void ObjectsPannel::DuplicateSelectedEntity()
+	{
+		if (m_SelectedEntity && m_CurrentScene)
+			m_SelectedEntity = m_CurrentScene->DuplicateEntity(m_SelectedEntity);
+	}
+
+	void ObjectsPannel::RenameSelectedEntity()
+	{
+		if (!m_SelectedEntity)
+			return;
+
+		m_RenamingEntity = m_SelectedEntity;
+		std::snprintf(m_RenameBuffer, sizeof(m_RenameBuffer), "%s", m_SelectedEntity.GetComponent<NameComponent>().Name.c_str());
+		m_FocusRename = true;
 	}
 	void ObjectsPannel::PropertiesWindow()
 	{
@@ -381,5 +539,7 @@ namespace Revoke
 	void ObjectsPannel::SetSelectedEntity(Entity entity)
 	{
 		m_SelectedEntity = entity;
+		if (m_RenamingEntity != entity)
+			m_RenamingEntity = {};
 	}
 }

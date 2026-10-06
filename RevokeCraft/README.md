@@ -15,7 +15,7 @@ single `CraftLayer`, and implements the `Revoke::CreateApplication()` factory re
 | File | Draws | Talks to |
 |---|---|---|
 | `CraftLayer.h`/`.cpp` | Dockspace, menu bar, viewport, gizmo manipulation | Owns the `Scene`, `EditorCamera`, framebuffer (for mouse picking via `ReadPixel`), and all the other panels; scene file I/O via `Serializer`/`FileExplorer` |
-| `ObjectsPannel.h`/`.cpp` *(sic — "Panel")* | "Scene Hierarchy" + "Properties" | Iterates `Scene`'s registry; one collapsible section per component (`DrawComponent<T>`) with Reset/Remove, and an "Add Component" menu |
+| `ObjectsPannel.h`/`.cpp` *(sic — "Panel")* | "Scene Hierarchy" + "Properties" | Hierarchy: entities in creation order (`Scene::GetEntities`), search, create menu, inline rename (F2 / double-click), duplicate (Ctrl+D), delete (Del). Properties: one collapsible section per component (`DrawComponent<T>`) with Reset/Remove, and an "Add Component" menu |
 | `EditorUI.h`/`.cpp` | Shared widgets | Label/value property rows (`UI::Property*`), X/Y/Z fields, asset drop fields, search box, icon buttons, tooltips |
 | `AssetType.h` | — | Maps a file extension to an `AssetType` and its icon; the Content Browser drag-and-drop payload name |
 | `ContentBrowser.h`/`.cpp` | "Content Browser" | Icon grid over the open project's assets tree; drag-and-drop source for textures/audio/scripts |
