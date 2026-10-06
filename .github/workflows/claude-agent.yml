@@ -58,6 +58,11 @@ jobs:
       group: claude-agent-${{ github.event.issue.number }}
       cancel-in-progress: false
     steps:
+      # First, so the outcome step below always has a start time to scope
+      # its lookups to - even when a later setup step fails or is cancelled.
+      - name: Record agent start time
+        run: echo "AGENT_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
       - name: Pick model from issue labels
         id: pick-model
         env:
@@ -76,9 +81,6 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-
-      - name: Record agent start time
-        run: echo "AGENT_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
 
       - name: Claude Code Action
         id: agent
@@ -326,7 +328,7 @@ jobs:
           JOB_STATUS: ${{ job.status }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          start="${AGENT_START:-1970-01-01T00:00:00Z}"
+          start="${AGENT_START:-}"
           bot='github-actions[bot]'
           # Only count PRs/issues whose body links this issue, so an overlapping
           # agent run on another issue can't be mistaken for this run's output.
@@ -335,12 +337,18 @@ jobs:
           # A failed lookup must not read as "the agent produced nothing", so
           # track it separately and say so instead.
           lookup_failed=0
+          prs=""; issues=""; comments=0; pushed=0
 
-          if ! prs="$(gh api "repos/$REPO/pulls?state=all&sort=created&direction=desc&per_page=50" \
+          # Without a start time the lookups would scan all of history and list
+          # unrelated old PRs/issues as this run's output, so skip them.
+          run_lookups() {
+          # Paginated: other PRs opened after $start could push this run's PR
+          # off the first page.
+          if ! prs="$(gh api --paginate "repos/$REPO/pulls?state=all&sort=created&direction=desc&per_page=100" \
             --jq ".[] | select(.user.login == \"$bot\" and .created_at >= \"$start\" and ($refs)) | \"- PR #\(.number): \(.html_url)\"")"; then
             lookup_failed=1; prs=""
           fi
-          if ! issues="$(gh api --method GET "repos/$REPO/issues" -f state=all -f creator="$bot" -f since="$start" -f per_page=50 \
+          if ! issues="$(gh api --paginate --method GET "repos/$REPO/issues" -f state=all -f creator="$bot" -f since="$start" -f per_page=100 \
             --jq ".[] | select(.pull_request == null and .created_at >= \"$start\" and ($refs)) | \"- Issue #\(.number): \(.html_url)\"")"; then
             lookup_failed=1; issues=""
           fi
@@ -348,12 +356,18 @@ jobs:
             --jq "[.[] | select(.user.login == \"$bot\")] | length" | awk '{s+=$1} END {print s+0}')"; then
             lookup_failed=1; comments=0
           fi
-          pushed=""
           if [ "$IS_PR" = "true" ]; then
             if ! pushed="$(gh pr view "$NUMBER" --repo "$REPO" --json commits \
               --jq "[.commits[] | select(.committedDate >= \"$start\")] | length")"; then
               lookup_failed=1; pushed=0
             fi
+          fi
+          }
+
+          if [ -n "$start" ]; then
+            run_lookups
+          else
+            lookup_failed=1
           fi
 
           produced=()
@@ -371,7 +385,7 @@ jobs:
               elif [ "${comments:-0}" -gt 0 ]; then
                 headline="**Agent run finished** without a PR or new issue - see its comment above."
               elif [ "$lookup_failed" = "1" ]; then
-                headline="**Agent run finished**, but checking what it produced failed (GitHub API error). Check the run log and this issue's PRs before rerunning."
+                headline="**Agent run finished**, but checking what it produced failed (API error or missing start time). Check the run log and this issue's PRs before rerunning."
                 nothing=1
               else
                 headline="**Agent run finished without producing anything** (no PR, issue, commit or comment). The task was not done."
