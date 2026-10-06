@@ -38,6 +38,9 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Record review start time
+        run: echo "REVIEW_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
       - name: Claude Code Review
         id: review
         # Pinned to the commit v1 pointed to on 2026-09-06, not the mutable
@@ -102,5 +105,20 @@ jobs:
           verdict="$(tr -d '[:space:]' < "${{ runner.temp }}/review-verdict.txt" 2>/dev/null || true)"
           if [ "$verdict" != "PASS" ]; then
             echo "::error::Claude review found issues or produced no verdict (got '${verdict}'). See the PR review comment."
+            exit 1
+          fi
+
+      # The verdict file is self-reported, so also confirm the review comment
+      # was actually posted during this run (the CLI can exit 0 even if the
+      # `gh pr review` call was denied or hit an API error).
+      - name: Verify review was posted
+        if: always() && steps.review.conclusion == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          count="$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews" \
+            --jq "[.[] | select(.user.login == \"github-actions[bot]\" and .submitted_at >= \"$REVIEW_START\")] | length")"
+          if [ "${count:-0}" -lt 1 ]; then
+            echo "::error::No review from github-actions[bot] was posted during this run."
             exit 1
           fi
