@@ -32,8 +32,8 @@ namespace Revoke
 		bool OnCloseRequested() override;
 
 		bool OnMouseBtnPressed(MouseButtonPressedEvent& e);
-		bool OnKeyPressed(KeyPressedEvent& e);
 
+		// The no-argument versions ask for a file, then offer to save unsaved changes first.
 		void NewProject();
 		void OpenProject();
 		void OpenProject(const std::filesystem::path& projectFilePath);
@@ -64,7 +64,12 @@ namespace Revoke
 		bool HasUnsavedChanges();
 		bool WriteScene(const std::filesystem::path& file);
 		bool SaveBeforeClosing();
+		// Runs action now, or once the user has answered "Save changes?" (unless they cancel)
+		// when the scene has unsaved changes.
+		void RunAfterSavePrompt(std::function<void()> action);
 		void DrawSavePrompt();
+		void DrawShortcutsWindow();
+		void HandleShortcuts();
 
 		void SetProject(Shared<Project> project);
 		std::filesystem::path GetAssetsDirectory() const;
@@ -82,7 +87,10 @@ namespace Revoke
 		std::filesystem::path m_ScenePath;
 		bool m_ShowSavePrompt = false;
 		bool m_LastSaveFailed = false;
+		// What to do once the save prompt is answered: close the editor, open a scene, ...
+		std::function<void()> m_PendingAction;
 		bool m_ResetLayoutRequested = false;
+		bool m_ShowShortcuts = false;
 
 		Entity m_CameraEntity;
 		Entity m_SecondCamera;
