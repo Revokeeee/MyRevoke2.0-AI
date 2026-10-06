@@ -43,6 +43,8 @@ namespace Revoke
 		std::array<Shared <Texture>, MaxTextures> Textures;
 		uint32_t TextureIndex = 1;
 
+		std::unordered_map<std::string, Shared<Texture>> TextureCache;
+
 		glm::vec4 QuadVertexPositions[4];
 
 		Renderer2D::Stats Statistic;
@@ -50,7 +52,7 @@ namespace Revoke
 
 	static Data2D* s_Data;
 
-	static const glm::vec4 whiteColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+
 	
 	void Renderer2D::Init()
 	{
@@ -83,6 +85,7 @@ namespace Revoke
 	void Renderer2D::Shutdown()
 	{
 		delete[] s_Data->QuadVertexBufferBase;
+		s_Data->TextureCache.clear();
 	}
 
 	void Renderer2D::Begin(const Camera& camera, const glm::mat4 transform)
@@ -113,7 +116,10 @@ namespace Revoke
 
 	void Renderer2D::End()
 	{
-		//Drawing
+		// Nothing batched. DrawElements treats a count of 0 as "the whole index buffer",
+		// which drew every stale vertex left in the buffer as a black quad over the viewport.
+		if (s_Data->QuadIndexCount == 0)
+			return;
 
 		uint32_t dataSize = (uint32_t)((uint8_t*)s_Data->QuadVertexBufferPointer - (uint8_t*)s_Data->QuadVertexBufferBase);
 		s_Data->QuadVB->InitData(s_Data->QuadVertexBufferBase, dataSize);
@@ -124,6 +130,7 @@ namespace Revoke
 		}
 		s_Data->Shader->Bind();
 		RendererAPI::DrawElements(s_Data->QuadVA, s_Data->QuadIndexCount);
+		s_Data->Statistic.DrawCalls++;
 	}
 
 	//Color Draw
@@ -186,7 +193,7 @@ namespace Revoke
 		s_Data->Statistic.QuadCount++;
 	}
 
-	void Renderer2D::DrawQuad(const glm::mat4& transform, const Shared<Texture>& texture, int entityID)
+	void Renderer2D::DrawQuad(const glm::mat4& transform, const Shared<Texture>& texture, int entityID, const glm::vec4& tint)
 	{
 		constexpr size_t quadVertexCount = 4;
 		constexpr glm::vec2 textureCoords[] = { { 0.0f, 0.0f }, { 1.0f, 0.0f }, { 1.0f, 1.0f }, { 0.0f, 1.0f } };
@@ -217,7 +224,7 @@ namespace Revoke
 		for (size_t i = 0; i < quadVertexCount; i++)
 		{
 			s_Data->QuadVertexBufferPointer->Position = transform * s_Data->QuadVertexPositions[i];
-			s_Data->QuadVertexBufferPointer->Color = whiteColor;
+			s_Data->QuadVertexBufferPointer->Color = tint;
 			s_Data->QuadVertexBufferPointer->TexCoord = textureCoords[i];
 			s_Data->QuadVertexBufferPointer->TexIndex = textureIndex;
 			s_Data->QuadVertexBufferPointer->EntityId = entityID;
@@ -234,14 +241,23 @@ namespace Revoke
 	{
 		if (!sprite.Texture2D.empty())
 		{
-			Shared<Texture> texture;
-			texture = std::make_shared<Texture>(sprite.Texture2D);
-			DrawQuad(transform, texture, entityID);
+			DrawQuad(transform, GetTexture(sprite.Texture2D), entityID, sprite.Color);
 		}
 		else
 		{
 			DrawQuad(transform, sprite.Color, entityID);
 		}
+	}
+
+	Shared<Texture> Renderer2D::GetTexture(const std::string& path)
+	{
+		auto it = s_Data->TextureCache.find(path);
+		if (it != s_Data->TextureCache.end())
+			return it->second;
+
+		Shared<Texture> texture = std::make_shared<Texture>(path);
+		s_Data->TextureCache.emplace(path, texture);
+		return texture;
 	}
 
 	void Renderer2D::QuadInit()

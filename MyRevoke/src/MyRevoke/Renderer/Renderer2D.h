@@ -32,9 +32,14 @@ namespace Revoke
 		static void DrawQuad(const glm::vec2& position, const glm::vec2 size, const Shared<Texture>& texture, int entityID);
 
 		static void DrawQuad(const glm::mat4& transform, const glm::vec4& color, int entityID);
-		static void DrawQuad(const glm::mat4& transform, const Shared<Texture>& texture, int entityID);
+		static void DrawQuad(const glm::mat4& transform, const Shared<Texture>& texture, int entityID, const glm::vec4& tint = glm::vec4(1.0f));
 
+		// Textured sprites are tinted by their Color.
 		static void DrawSprite(const glm::mat4& transform, SpriteRendererComponent& sprite, int entityID);
+
+		// Loads each file once and hands out the same texture after that. Sprites draw every
+		// frame, so loading from disk per draw would stall the editor.
+		static Shared<Texture> GetTexture(const std::string& path);
 
 		static void QuadInit();
 	private:
