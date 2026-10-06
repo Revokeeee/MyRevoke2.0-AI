@@ -342,6 +342,9 @@ OpenCover/
 
 # Custom ignore rules
 
+# Staged editor folder and the installer built from it
+/dist/
+
 # RevokeCraft builds into its own folder, next to the assets it loads at runtime
 /RevokeCraft/RevokeCraft.exe
 /RevokeCraft/RevokeCraft.exp
