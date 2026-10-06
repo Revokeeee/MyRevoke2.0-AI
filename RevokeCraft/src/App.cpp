@@ -9,6 +9,7 @@ namespace Revoke {
 	{
 	public:
 		RevokeCraft()
+			: Application(WindowSettings("MyRevoke", 1280, 720, true))
 		{
 			PushLayer(new CraftLayer());
 		}
