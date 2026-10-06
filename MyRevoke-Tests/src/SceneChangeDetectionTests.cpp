@@ -1,5 +1,8 @@
 #include <doctest/doctest.h>
 
+// The scene headers pull in windows.h; keep its min/max macros out of entt.
+#define NOMINMAX
+
 #include "MyRevoke/Scene/Scene.h"
 #include "MyRevoke/Scene/Components.h"
 #include "MyRevoke/Scene/Serializer.h"

@@ -1,6 +1,7 @@
 #include "CraftLayer.h"
 
 #include <chrono>
+#include <fstream>
 #include <string>
 
 #include "MyRevoke/Utility/FileExplorer.h"
@@ -508,11 +509,13 @@ namespace Revoke
 
 	void CraftLayer::WriteScene(const std::filesystem::path& file)
 	{
-		Serializer sceneSerializer(m_Scene, GetAssetsDirectory());
-		sceneSerializer.Serealize(file.string());
+		// Serialize once and keep that text as the saved snapshot; this is what Serializer::Serealize
+		// does, minus a second pass over the scene.
+		std::string text = SerializeScene();
+		std::ofstream(file) << text;
 
+		m_SavedSceneState = text;
 		m_ScenePath = file;
-		MarkSceneSaved();
 	}
 
 	std::string CraftLayer::SerializeScene()
