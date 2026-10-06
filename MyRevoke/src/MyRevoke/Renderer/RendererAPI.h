@@ -13,6 +13,7 @@ namespace Revoke
 		static void Clear();
 		static void DrawElements(const Shared<VertexArray>& vertrexArray, uint32_t count = 0);
 		static void EnableBlending();
+		static void DisableBlending();
 		static void WindowResize(float width, float height);
 		 
 		static void Init();

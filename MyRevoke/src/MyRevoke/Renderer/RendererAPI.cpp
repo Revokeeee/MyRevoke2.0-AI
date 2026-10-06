@@ -28,6 +28,10 @@ namespace Revoke
 
 		//glEnable(GL_DEPTH_TEST);
 	}
+	void RendererAPI::DisableBlending()
+	{
+		glDisable(GL_BLEND);
+	}
 	void RendererAPI::WindowResize(float width, float height)
 	{
 		glViewport(0, 0, width, height);
