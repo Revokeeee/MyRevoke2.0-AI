@@ -4,6 +4,11 @@ workspace "MyRevoke"
 
     configurations { "Debug", "Release", "Dist" }
 
+    -- fmt, which spdlog bundles, refuses to compile on MSVC without /utf-8.
+    filter "action:vs*"
+        buildoptions { "/utf-8" }
+    filter {}
+
     -- The vendored dependency projects only have Debug and Release filters of their own,
     -- and they live in submodules, so Dist gets its build settings for them from here.
     filter "configurations:Dist"
@@ -40,6 +45,16 @@ workspace "MyRevoke"
         include "MyRevoke/vendor/yaml-cpp"
         include "MyRevoke/vendor/Box2D"
     group ""
+
+    -- These vendored scripts optimise even in Debug. Premake 5.0 no longer
+    -- writes BasicRuntimeChecks=Default for that case, so MSBuild adds /RTC1
+    -- and MSVC rejects it next to /Ox (D8016).
+    for _, name in ipairs { "Box2D", "ImGui", "yaml-cpp" } do
+        project(name)
+            filter "configurations:Debug"
+                runtimechecks "Off"
+            filter {}
+    end
 
     project "MyRevoke"
         location "MyRevoke"
@@ -111,7 +126,7 @@ workspace "MyRevoke"
             
         }
         filter "files:vendor/ImGuizmo/**.cpp"
-            flags {"NoPCH"}
+            enablepch "Off"
         filter "system:windows"
             systemversion "latest"
 
