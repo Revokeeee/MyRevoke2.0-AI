@@ -135,11 +135,17 @@ namespace Revoke
 
 	}
 
-	void CraftLayer::BuildDefaultDockLayout(ImGuiID dockspaceId)
+	bool CraftLayer::BuildDefaultDockLayout(ImGuiID dockspaceId)
 	{
+		// A minimized window reports a zero size, which would make the splits below
+		// divide by zero. Skip it; the empty-dockspace check retries next frame.
+		ImVec2 viewportSize = ImGui::GetMainViewport()->Size;
+		if (viewportSize.x <= 0.0f || viewportSize.y <= 0.0f)
+			return false;
+
 		ImGui::DockBuilderRemoveNode(dockspaceId);
 		ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
-		ImGui::DockBuilderSetNodeSize(dockspaceId, ImGui::GetMainViewport()->Size);
+		ImGui::DockBuilderSetNodeSize(dockspaceId, viewportSize);
 
 		// Full-height right column (Scene Settings over Properties); the rest is
 		// Hierarchy | toolbar-over-Viewport, with the Content Browser below them.
@@ -171,6 +177,7 @@ namespace Revoke
 		}
 
 		ImGui::DockBuilderFinish(dockspaceId);
+		return true;
 	}
 
 	void CraftLayer::OnImGuiDraw()
@@ -207,8 +214,12 @@ namespace Revoke
 		ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
 		if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable)
 		{
-			if (ImGui::DockBuilderGetNode(dockspace_id) == nullptr)
-				BuildDefaultDockLayout(dockspace_id);
+			// Rebuild before DockSpace() submits the node this frame, never after it.
+			if (m_ResetLayoutRequested || ImGui::DockBuilderGetNode(dockspace_id) == nullptr)
+			{
+				if (BuildDefaultDockLayout(dockspace_id))
+					m_ResetLayoutRequested = false;
+			}
 
 			ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
 		}
@@ -230,7 +241,7 @@ namespace Revoke
 
 			if (ImGui::BeginMenu("View"))
 			{
-				if (ImGui::MenuItem("Reset Layout")) BuildDefaultDockLayout(dockspace_id);
+				if (ImGui::MenuItem("Reset Layout")) m_ResetLayoutRequested = true;
 
 				ImGui::EndMenu();
 			}
