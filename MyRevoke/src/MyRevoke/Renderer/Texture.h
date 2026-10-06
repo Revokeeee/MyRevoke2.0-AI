@@ -14,7 +14,8 @@ namespace Revoke
 		uint32_t GetWidth() const { return m_Width; };
 		uint32_t GetHeight() const { return m_Height; };
 		uint32_t GetID() const { return m_RendererID; }
-
+		// False when the file could not be read; the texture then holds a placeholder.
+		bool IsLoaded() const { return m_Loaded; }
 
 		void Bind(uint32_t slot) const;
 		void UnBind() const;
@@ -24,6 +25,7 @@ namespace Revoke
 	private:
 		uint32_t m_Width, m_Height;
 		uint32_t m_RendererID;
+		bool m_Loaded = true;
 	};
 
 

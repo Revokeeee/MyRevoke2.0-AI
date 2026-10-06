@@ -50,7 +50,8 @@ namespace Revoke {
 		float m_PerspectiveNear = 0.01f,
 			m_PerspectiveFar = 1000.0f;
 
-		float m_AspectRatio = 0.0f;
+		// 16:9 until the first real viewport size arrives; 0 gives a degenerate projection.
+		float m_AspectRatio = 16.0f / 9.0f;
 	};
 
 }

@@ -32,6 +32,11 @@ namespace Revoke
 
 	void SceneCamera::SetViewportSize(uint32_t width, uint32_t height)
 	{
+		// A scene opened before the viewport has been laid out (or while it is collapsed)
+		// reports 0. An aspect of 0 or infinity trips glm's perspective assert, so keep the old one.
+		if (width == 0 || height == 0)
+			return;
+
 		m_AspectRatio = (float)width / (float)height;
 		RecalculateProjection();
 	}
