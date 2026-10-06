@@ -139,16 +139,34 @@ namespace Revoke
 		ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
 		ImGui::DockBuilderSetNodeSize(dockspaceId, ImGui::GetMainViewport()->Size);
 
-		ImGuiID centerId = dockspaceId;
-		ImGuiID bottomId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Down, 0.25f, nullptr, &centerId);
-		ImGuiID leftId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Left, 0.20f, nullptr, &centerId);
-		ImGuiID rightId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Right, 0.30f, nullptr, &centerId);
+		// Full-height right column (Scene Settings over Properties); the rest is
+		// Hierarchy | toolbar-over-Viewport, with the Content Browser below them.
+		ImGuiID mainId = dockspaceId;
+		ImGuiID rightId = ImGui::DockBuilderSplitNode(mainId, ImGuiDir_Right, 0.13f, nullptr, &mainId);
+		ImGuiID propertiesId = rightId;
+		ImGuiID settingsId = ImGui::DockBuilderSplitNode(propertiesId, ImGuiDir_Up, 0.22f, nullptr, &propertiesId);
 
+		ImGuiID centerId = mainId;
+		ImGuiID bottomId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Down, 0.21f, nullptr, &centerId);
+		ImGuiID leftId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Left, 0.21f, nullptr, &centerId);
+
+		// The toolbar should stay a fixed strip, so size it in pixels rather than as a share of the window.
+		const float toolbarHeight = 32.0f;
+		float centerHeight = ImGui::DockBuilderGetNode(centerId)->Size.y;
+		ImGuiID toolbarId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Up, toolbarHeight / centerHeight, nullptr, &centerId);
+
+		ImGui::DockBuilderDockWindow("Scene Settings", settingsId);
+		ImGui::DockBuilderDockWindow("Properties", propertiesId);
 		ImGui::DockBuilderDockWindow("Content Browser", bottomId);
 		ImGui::DockBuilderDockWindow("Scene Hierarchy", leftId);
-		ImGui::DockBuilderDockWindow("Properties", rightId);
-		ImGui::DockBuilderDockWindow("Scene Settings", rightId);
+		ImGui::DockBuilderDockWindow("##toolbar", toolbarId);
 		ImGui::DockBuilderDockWindow("Viewport", centerId);
+
+		for (ImGuiID id : { toolbarId, centerId })
+		{
+			ImGuiDockNode* node = ImGui::DockBuilderGetNode(id);
+			node->SetLocalFlags(node->LocalFlags | ImGuiDockNodeFlags_HiddenTabBar);
+		}
 
 		ImGui::DockBuilderFinish(dockspaceId);
 	}
