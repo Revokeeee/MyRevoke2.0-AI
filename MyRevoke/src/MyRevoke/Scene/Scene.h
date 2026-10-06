@@ -30,6 +30,12 @@ namespace Revoke
 			
 			Entity CreateEntity(const std::string name = std::string());
 			Entity CreateEntity(UUID id, const std::string name = std::string());
+			// A new entity (with a new id) holding copies of the source's components.
+			Entity DuplicateEntity(Entity source);
+
+			// Every entity, oldest first. The registry itself iterates newest first, which made the
+			// hierarchy and the scene file flip order on every save and reload.
+			std::vector<Entity> GetEntities();
 
 			// Returns an empty Entity when no entity has this id.
 			Entity FindEntityByUUID(UUID id);

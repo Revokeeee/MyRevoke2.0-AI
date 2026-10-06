@@ -17,25 +17,6 @@
 
 namespace Revoke
 {
-	namespace Utils
-	{
-		static bool IsPayloadScene(const wchar_t* path) {
-			if (path == nullptr) {
-				return false;
-			}
-
-			const wchar_t* extension = L".myrevoke";
-			size_t pathLen = wcslen(path);
-			size_t extLen = wcslen(extension);
-
-			if (pathLen < extLen) {
-				return false;
-			}
-
-			const wchar_t* pathExtension = path + pathLen - extLen;
-			return wcscmp(pathExtension, extension) == 0;
-		}
-	}
 
 	CraftLayer::CraftLayer()
 		:Layer("CraftLayer")
@@ -61,6 +42,7 @@ namespace Revoke
 
 		SetPanelsScene(m_Scene);
 		m_ToolBar.SetPlayCallbacks([this]() { OnScenePlay(); }, [this]() { OnSceneStop(); });
+		m_ContentBrowserPanel.SetOpenSceneCallback([this](const std::filesystem::path& scene) { OpenScene(scene); });
 
 		RendererAPI::SetClearColor({ 0.2f, 0.2f, 0.2f, 1.0f });
 		RendererAPI::EnableBlending();
@@ -289,19 +271,31 @@ namespace Revoke
 
 		ImGui::Image((void*)textureID, ImVec2{ m_ViewportSize.x, m_ViewportSize.y }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 
+		// Dropping a scene opens it; dropping an image adds a sprite showing it.
 		if (ImGui::BeginDragDropTarget())
 		{
-			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_PAYLOAD"))
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(ContentBrowserPayload, ImGuiDragDropFlags_AcceptBeforeDelivery | ImGuiDragDropFlags_AcceptNoDrawDefaultRect))
 			{
-				const wchar_t* path = (const wchar_t*)payload->Data;
+				std::filesystem::path path((const wchar_t*)payload->Data);
+				AssetType type = GetAssetType(path);
+				bool editing = m_ToolBar.GetSceneState() == SceneState::Editor;
+				bool accepted = type == AssetType::Scene || (type == AssetType::Texture && editing);
 
-				if (Utils::IsPayloadScene(path))
+				ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
+					ImGui::GetColorU32(accepted ? Theme::Accent : Theme::Error), 0.0f, 0, 3.0f * ImGuiLayer::GetUIScale());
+
+				if (accepted && payload->IsDelivery())
 				{
-					OpenScene(GetAssetsDirectory() / path);
-				}
-				else
-				{
-					RV_EDITOR_ERROR("Wrong Scene File");
+					if (type == AssetType::Scene)
+					{
+						OpenScene(GetAssetsDirectory() / path);
+					}
+					else
+					{
+						Entity sprite = m_Scene->CreateEntity(path.stem().string());
+						sprite.AddComponent<SpriteRendererComponent>((GetAssetsDirectory() / path).string());
+						m_ObjPannel.SetSelectedEntity(sprite);
+					}
 				}
 			}
 
@@ -454,6 +448,19 @@ namespace Revoke
 		{
 			if (!ctrl)
 				m_ToolBar.SetGizmoTool(GizmoTool::Scale);
+			break;
+		}
+		// The hierarchy handles these itself while it has focus; here they cover the viewport.
+		case RV_KEY_DELETE:
+		{
+			if (m_ViewportFocused)
+				m_ObjPannel.DeleteSelectedEntity();
+			break;
+		}
+		case RV_KEY_D:
+		{
+			if (ctrl && m_ViewportFocused)
+				m_ObjPannel.DuplicateSelectedEntity();
 			break;
 		}
 		}

@@ -78,6 +78,66 @@ namespace Revoke
         return entity;
     }
 
+    template<typename T>
+    static void CopyComponentIfExists(Entity destination, Entity source)
+    {
+        if (!source.HasComponent<T>())
+            return;
+
+        // Copy out first: the destination's storage may grow while the component is added.
+        T component = source.GetComponent<T>();
+        if (destination.HasComponent<T>())
+            destination.GetComponent<T>() = component;
+        else
+            destination.AddComponent<T>(component);
+    }
+
+    Entity Scene::DuplicateEntity(Entity source)
+    {
+        Entity copy = CreateEntity(source.GetComponent<NameComponent>().Name);
+
+        CopyComponentIfExists<TransformComponent>(copy, source);
+        CopyComponentIfExists<SpriteRendererComponent>(copy, source);
+        CopyComponentIfExists<CameraComponent>(copy, source);
+        CopyComponentIfExists<RigidBodyComponent>(copy, source);
+        CopyComponentIfExists<BoxCollisionComponent>(copy, source);
+        CopyComponentIfExists<NativeScriptComponent>(copy, source);
+        CopyComponentIfExists<SoundComponent>(copy, source);
+
+        // Duplicating the main camera would leave two entities claiming the role.
+        if (copy.HasComponent<CameraComponent>())
+            copy.GetComponent<CameraComponent>().isMain = false;
+
+        // Runtime objects belong to the source; the copy gets its own or none.
+        if (copy.HasComponent<RigidBodyComponent>())
+            copy.GetComponent<RigidBodyComponent>().Body = nullptr;
+        if (copy.HasComponent<NativeScriptComponent>())
+            copy.GetComponent<NativeScriptComponent>().Instance = nullptr;
+        if (copy.HasComponent<SoundComponent>())
+        {
+            auto& sound = copy.GetComponent<SoundComponent>();
+            sound.BufferID = 0;
+            sound.SourceID = 0;
+            sound.SetPath(sound.AudioPath);
+        }
+
+        return copy;
+    }
+
+    std::vector<Entity> Scene::GetEntities()
+    {
+        // Every entity gets an IdComponent when it is created, so its storage holds them in
+        // creation order; views walk it backwards.
+        std::vector<Entity> entities;
+        auto view = m_Registry.view<IdComponent>();
+        entities.reserve(view.size());
+        for (auto handle : view)
+            entities.emplace_back(handle, this);
+
+        std::reverse(entities.begin(), entities.end());
+        return entities;
+    }
+
     Entity Scene::FindEntityByUUID(UUID id)
     {
         auto view = m_Registry.view<IdComponent>();
@@ -311,6 +371,15 @@ namespace Revoke
         if (ent.HasComponent<SoundComponent>())
             ent.GetComponent<SoundComponent>().ShutDown();
         DestroyScriptInstance(ent);
+
+        // Deleted while playing: take the body out of the world too, or it keeps colliding.
+        if (m_B2World && ent.HasComponent<RigidBodyComponent>())
+        {
+            auto& rigidBody = ent.GetComponent<RigidBodyComponent>();
+            if (rigidBody.Body)
+                m_B2World->DestroyBody(rigidBody.Body);
+            rigidBody.Body = nullptr;
+        }
 
         m_Registry.destroy(ent);
     }
