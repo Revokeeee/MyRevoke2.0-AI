@@ -51,7 +51,18 @@ jobs:
         (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
       )
     runs-on: ubuntu-latest
+    # One agent run per issue/PR at a time; a second trigger queues instead
+    # of racing the first. Job-level so ordinary comments, which skip the job,
+    # never enter the group and bump a queued run.
+    concurrency:
+      group: claude-agent-${{ github.event.issue.number }}
+      cancel-in-progress: false
     steps:
+      # First, so the outcome step below always has a start time to scope
+      # its lookups to - even when a later setup step fails or is cancelled.
+      - name: Record agent start time
+        run: echo "AGENT_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
       - name: Pick model from issue labels
         id: pick-model
         env:
@@ -72,6 +83,7 @@ jobs:
           submodules: recursive
 
       - name: Claude Code Action
+        id: agent
         # Pinned to the commit v1 pointed to on 2026-09-06, not the mutable
         # @v1 tag - an upstream change to that tag can't silently alter
         # what runs here with our write access + API key. Bump deliberately.
@@ -139,6 +151,7 @@ jobs:
                version. Keep it short: read `.github/WRITING_STYLE.md` first
                and follow its limits (the whole body under 150 words).
                - Summary: what changed and why, 3 sentences max, link the issue
+                 as `#${{ github.event.issue.number }}` (the job checks for it)
                - Checklist: tick honestly. For tests, one line on how you
                  verified it. Tick "needs close human review" if the change
                  involves a structural decision or anything you are unsure of.
@@ -151,7 +164,8 @@ jobs:
             said in a comment on some other issue or PR. Create them directly
             with `gh issue create`. Give each a clear, specific title and a
             body with real context: what the work is, why it's needed, where
-            it came from (link the issue/PR that prompted it), and concrete
+            it came from (write `#${{ github.event.issue.number }}` in the body;
+            the job checks for it), and concrete
             acceptance criteria where you can state them.
 
             Every issue title starts with one or more area tags in square
@@ -199,6 +213,13 @@ jobs:
             your own turns for judgment calls, architecture decisions, and
             actually writing the code. Skip this for anything already small
             enough that delegating it would cost more than it saves.
+
+            Always run subagents in the foreground (`run_in_background: false`)
+            and wait for their result in the same turn. This is a one-shot
+            headless run: the moment you end your turn the job exits and any
+            background work is lost - nothing will ever wake you up again. Never
+            end your turn to "wait for a notification"; only end it once the PR,
+            issue(s) or failure comment exists.
 
             ## How to write the code
 
@@ -292,3 +313,109 @@ jobs:
 
             You never merge pull requests, and you never approve them - a
             human always makes that call.
+
+      # The agent only reports on the issue when it decides to, so a run that
+      # stops early (failure, cancel, or ending its turn before finishing)
+      # used to leave the issue silent while the job showed green. Always
+      # post the outcome here, and fail the job if the agent produced nothing.
+      - name: Report outcome on the issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+          IS_PR: ${{ github.event.issue.pull_request != null }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # Without this, run: steps use plain `bash -e`, and a failed `gh api` in a
+          # pipeline (e.g. into awk) would go unnoticed.
+          set -o pipefail
+          start="${AGENT_START:-}"
+          bot='github-actions[bot]'
+          # Only count PRs/issues whose body links this issue, so an overlapping
+          # agent run on another issue can't be mistaken for this run's output.
+          refs="(.body // \"\") | test(\"#$NUMBER([^0-9]|$)\")"
+
+          # A failed lookup must not read as "the agent produced nothing", so
+          # track it separately and say so instead.
+          lookup_failed=0
+          prs=""; issues=""; comments=0; pushed=0
+
+          # Without a start time the lookups would scan all of history and list
+          # unrelated old PRs/issues as this run's output, so skip them.
+          run_lookups() {
+          # Newest first, page by page, stopping at the first page that reaches
+          # back past $start - so other PRs opened during the run can't push
+          # this run's PR off page 1, and old history is never walked. (Search
+          # would be one call, but its index lags and can miss a fresh PR.)
+          page=1
+          while :; do
+            if ! page_json="$(gh api "repos/$REPO/pulls?state=all&sort=created&direction=desc&per_page=100&page=$page")"; then
+              lookup_failed=1; break  # keep matches from earlier pages
+            fi
+            if ! matches="$(jq -r ".[] | select(.user.login == \"$bot\" and .created_at >= \"$start\" and ($refs)) | \"- PR #\(.number): \(.html_url)\"" <<< "$page_json")" \
+              || ! last_page="$(jq "length < 100 or (last.created_at < \"$start\")" <<< "$page_json")"; then
+              lookup_failed=1; break
+            fi
+            [ -n "$matches" ] && prs="${prs:+$prs$'\n'}$matches"
+            [ "$last_page" = "true" ] && break
+            page=$((page + 1))
+          done
+          if ! issues="$(gh api --paginate --method GET "repos/$REPO/issues" -f state=all -f creator="$bot" -f since="$start" -f per_page=100 \
+            --jq ".[] | select(.pull_request == null and .created_at >= \"$start\" and ($refs)) | \"- Issue #\(.number): \(.html_url)\"")"; then
+            lookup_failed=1; issues=""
+          fi
+          if ! comments="$(gh api --paginate "repos/$REPO/issues/$NUMBER/comments?since=$start" \
+            --jq "[.[] | select(.user.login == \"$bot\")] | length" | awk '{s+=$1} END {print s+0}')"; then
+            lookup_failed=1; comments=0
+          fi
+          if [ "$IS_PR" = "true" ]; then
+            if ! pushed="$(gh pr view "$NUMBER" --repo "$REPO" --json commits \
+              --jq "[.commits[] | select(.committedDate >= \"$start\")] | length")"; then
+              lookup_failed=1; pushed=0
+            fi
+          fi
+          }
+
+          if [ -n "$start" ]; then
+            run_lookups
+          else
+            lookup_failed=1
+          fi
+
+          produced=()
+          [ -n "$prs" ] && produced+=("$prs")
+          [ -n "$issues" ] && produced+=("$issues")
+          [ "${pushed:-0}" -gt 0 ] && produced+=("- Pushed new commits to this PR")
+
+          nothing=0
+          case "$JOB_STATUS" in
+            cancelled) headline="**Agent run was cancelled** before it finished." ;;
+            failure)   headline="**Agent run failed.**" ;;
+            *)
+              if [ "${#produced[@]}" -gt 0 ]; then
+                headline="**Agent run finished.**"
+              elif [ "${comments:-0}" -gt 0 ]; then
+                headline="**Agent run finished** without a PR or new issue - see its comment above."
+              elif [ "$lookup_failed" = "1" ]; then
+                headline="**Agent run finished**, but checking what it produced failed (API error or missing start time). Check the run log and this issue's PRs before rerunning."
+                nothing=1
+              else
+                headline="**Agent run finished without producing anything** (no PR, issue, commit or comment). The task was not done."
+                nothing=1
+              fi
+              ;;
+          esac
+
+          {
+            printf '%s\n' "$headline"
+            [ "${#produced[@]}" -gt 0 ] && printf '%s\n' "${produced[@]}"
+            printf '\nRun log: %s\n' "$RUN_URL"
+          } > "$RUNNER_TEMP/agent-status.md"
+          gh issue comment "$NUMBER" --repo "$REPO" --body-file "$RUNNER_TEMP/agent-status.md"
+
+          if [ "$nothing" = "1" ]; then
+            echo "::error::$headline"
+            exit 1
+          fi
