@@ -29,6 +29,7 @@ namespace Revoke
 		void OnUpdate(Timestep deltaTime) override;
 		void OnImGuiDraw() override;
 		void OnEvent(Event& e) override;
+		bool OnCloseRequested() override;
 
 		bool OnMouseBtnPressed(MouseButtonPressedEvent& e);
 		bool OnKeyPressed(KeyPressedEvent& e);
@@ -40,8 +41,9 @@ namespace Revoke
 		void NewScene();
 		void OpenScene();
 		void OpenScene(const std::filesystem::path& path);
-		void SaveAs();
-		void Save();
+		// Both return false when nothing was saved (no project, dialog cancelled, or the write failed).
+		bool SaveAs();
+		bool Save();
 
 		// The scene being played while in Play mode, otherwise the scene being edited.
 		Shared<Scene> GetCurrentScene() const { return m_RuntimeScene ? m_RuntimeScene : m_Scene; }
@@ -56,6 +58,12 @@ namespace Revoke
 		// sensible default layout. Only called when no layout has been saved yet, or from
 		// View > Reset Layout.
 		void BuildDefaultDockLayout(ImGuiID dockspaceId);
+		std::string SerializeScene();
+		void MarkSceneSaved();
+		bool HasUnsavedChanges();
+		bool WriteScene(const std::filesystem::path& file);
+		bool SaveBeforeClosing();
+		void DrawSavePrompt();
 
 		void SetProject(Shared<Project> project);
 		std::filesystem::path GetAssetsDirectory() const;
@@ -67,6 +75,12 @@ namespace Revoke
 		Shared<Scene> m_Scene;
 		Shared<Scene> m_RuntimeScene;
 		Shared<Project> m_Project;
+
+		// The scene as last saved, opened or created, to tell whether it has unsaved changes.
+		std::string m_SavedSceneState;
+		std::filesystem::path m_ScenePath;
+		bool m_ShowSavePrompt = false;
+		bool m_LastSaveFailed = false;
 
 		Entity m_CameraEntity;
 		Entity m_SecondCamera;

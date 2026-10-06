@@ -1,6 +1,7 @@
 #include "CraftLayer.h"
 
 #include <chrono>
+#include <fstream>
 #include <string>
 
 #include "MyRevoke/Utility/FileExplorer.h"
@@ -67,6 +68,7 @@ namespace Revoke
 		RendererAPI::EnableBlending();
 
 		OpenProject(GetExecutableDirectory() / "projects" / "Example" / "Example.mrproject");
+		MarkSceneSaved();
 	}
 	void CraftLayer::OnDetach()
 	{
@@ -215,7 +217,7 @@ namespace Revoke
 		{
 			if (ImGui::BeginMenu("File"))
 			{
-				if (ImGui::MenuItem("Exit")) Application::Get().Close();
+				if (ImGui::MenuItem("Exit")) Application::Get().RequestClose();
 				if (ImGui::MenuItem("New Project")) NewProject();
 				if (ImGui::MenuItem("Open Project")) OpenProject();
 				if (ImGui::MenuItem("New Scene", "Ctrl+N")) NewScene();
@@ -235,6 +237,8 @@ namespace Revoke
 
 			ImGui::EndMenuBar();
 		}
+
+		DrawSavePrompt();
 
 		//-----------Settings-------------------------------------------------
 	
@@ -488,6 +492,9 @@ namespace Revoke
 		m_Scene->OnSceneClose();
 		m_Scene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
 		SetPanelsScene(m_Scene);
+
+		m_ScenePath.clear();
+		MarkSceneSaved();
 	}
 
 	void CraftLayer::OpenScene()
@@ -507,35 +514,131 @@ namespace Revoke
 		m_Scene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
 		
 		Serializer sceneSerializer(m_Scene, GetAssetsDirectory());
- 		sceneSerializer.DeSerealize(path.string());
+ 		bool loaded = sceneSerializer.DeSerealize(path.string());
 
 		SetPanelsScene(m_Scene);
+
+		m_ScenePath = loaded ? path : std::filesystem::path();
+		MarkSceneSaved();
 	}
 
-	void CraftLayer::SaveAs()
+	bool CraftLayer::SaveAs()
 	{
 		std::string path = FileExplorer::SaveFile("MyRevoke Scene (*.myrevoke)\0*.myrevoke\0");
 
-		if (!path.empty())
-		{
-			Serializer sceneSerializer(m_Scene, GetAssetsDirectory());
-			sceneSerializer.Serealize(path+".myrevoke");
-		}
+		if (path.empty())
+			return false;
+
+		return WriteScene(path + ".myrevoke");
 	}
 
-	void CraftLayer::Save()
+	bool CraftLayer::Save()
 	{
+		// A scene that came from, or was already saved to, a file goes back to that file.
+		if (!m_ScenePath.empty())
+			return WriteScene(m_ScenePath);
+
 		if (!m_Project)
 		{
 			RV_EDITOR_ERROR("No project open - use Save as to pick a file");
-			return;
+			return false;
 		}
 
 		std::filesystem::path scenesDirectory = m_Project->GetScenesDirectory();
 		std::filesystem::create_directories(scenesDirectory);
 
+		return WriteScene(scenesDirectory / (m_Scene->GetName() + ".myrevoke"));
+	}
+
+	bool CraftLayer::WriteScene(const std::filesystem::path& file)
+	{
+		// Serialize once and keep that text as the saved snapshot; this is what Serializer::Serealize
+		// does, minus a second pass over the scene.
+		std::string text = SerializeScene();
+		std::ofstream out(file);
+		out << text;
+		out.close();
+
+		// A failed write must not count as saved, or the close prompt would never warn about it.
+		m_LastSaveFailed = out.fail();
+		if (m_LastSaveFailed)
+		{
+			RV_EDITOR_ERROR("Could not write the scene to {}", file.string());
+			return false;
+		}
+
+		m_SavedSceneState = text;
+		m_ScenePath = file;
+		return true;
+	}
+
+	std::string CraftLayer::SerializeScene()
+	{
 		Serializer sceneSerializer(m_Scene, GetAssetsDirectory());
-		sceneSerializer.Serealize((scenesDirectory / (m_Scene->GetName() + ".myrevoke")).string());
+		return sceneSerializer.SerializeToString();
+	}
+
+	void CraftLayer::MarkSceneSaved()
+	{
+		m_SavedSceneState = SerializeScene();
+	}
+
+	bool CraftLayer::HasUnsavedChanges()
+	{
+		return SerializeScene() != m_SavedSceneState;
+	}
+
+	// A scene that was never saved asks where to go (Save() would pick a path silently, and could
+	// overwrite a file that happens to share the scene's name).
+	bool CraftLayer::SaveBeforeClosing()
+	{
+		return m_ScenePath.empty() ? SaveAs() : Save();
+	}
+
+	bool CraftLayer::OnCloseRequested()
+	{
+		if (!HasUnsavedChanges())
+			return true;
+
+		m_ShowSavePrompt = true;
+		return false;
+	}
+
+	void CraftLayer::DrawSavePrompt()
+	{
+		if (m_ShowSavePrompt)
+		{
+			ImGui::OpenPopup("Save changes?");
+			m_ShowSavePrompt = false;
+			m_LastSaveFailed = false;
+		}
+
+		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+		if (!ImGui::BeginPopupModal("Save changes?", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+			return;
+
+		ImGui::Text("Save changes to \"%s\" before closing?", m_Scene->GetName().c_str());
+		if (m_LastSaveFailed)
+			ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Could not save the scene. See the log.");
+		ImGui::Spacing();
+
+		if (ImGui::Button("Save"))
+		{
+			// A failed or cancelled save leaves this prompt open instead of losing the changes.
+			if (SaveBeforeClosing())
+				Application::Get().Close();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Don't Save"))
+		{
+			Application::Get().Close();
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel"))
+			ImGui::CloseCurrentPopup();
+
+		ImGui::EndPopup();
 	}
 
 }

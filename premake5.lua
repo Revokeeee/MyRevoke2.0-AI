@@ -350,11 +350,7 @@ workspace "MyRevoke"
         }
 
         -- Tests that touch the scene load the audio code, so the exe needs OpenAL32.dll beside it.
-        postbuildcommands
-        {
-            '{COPYFILE} "%{wks.location}MyRevoke/vendor/OpenALBuild/lib/%{cfg.buildcfg}/OpenAL32.dll" "%{cfg.targetdir}"'
-        }
-
+        -- OpenAL is vendored as Debug and Release only, so Dist copies the Release one.
         filter "system:windows"
             systemversion "latest"
 
@@ -368,17 +364,29 @@ workspace "MyRevoke"
             defines "RV_DEBUG"
             runtime "Debug"
             symbols "On"
+            postbuildcommands
+            {
+                '{COPYFILE} "%{wks.location}MyRevoke/vendor/OpenALBuild/lib/Debug/OpenAL32.dll" "%{cfg.targetdir}"'
+            }
 
         filter "configurations:Release"
             defines "RV_RELEASE"
             runtime "Release"
             optimize "On"
+            postbuildcommands
+            {
+                '{COPYFILE} "%{wks.location}MyRevoke/vendor/OpenALBuild/lib/Release/OpenAL32.dll" "%{cfg.targetdir}"'
+            }
 
         filter "configurations:Dist"
             defines "RV_DIST"
             runtime "Release"
             optimize "On"
             symbols "Off"
+            postbuildcommands
+            {
+                '{COPYFILE} "%{wks.location}MyRevoke/vendor/OpenALBuild/lib/Release/OpenAL32.dll" "%{cfg.targetdir}"'
+            }
 
      project "MyRevoke-ScriptCore"
         location "MyRevoke-ScriptCore"
