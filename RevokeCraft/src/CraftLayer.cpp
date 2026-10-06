@@ -147,7 +147,7 @@ namespace Revoke
 		// Full-height right column (Scene Settings over Properties); the rest is
 		// Hierarchy | toolbar-over-Viewport, with the Content Browser below them.
 		ImGuiID mainId = dockspaceId;
-		ImGuiID rightId = ImGui::DockBuilderSplitNode(mainId, ImGuiDir_Right, 0.13f, nullptr, &mainId);
+		ImGuiID rightId = ImGui::DockBuilderSplitNode(mainId, ImGuiDir_Right, 0.19f, nullptr, &mainId);
 		ImGuiID propertiesId = rightId;
 		ImGuiID settingsId = ImGui::DockBuilderSplitNode(propertiesId, ImGuiDir_Up, 0.22f, nullptr, &propertiesId);
 

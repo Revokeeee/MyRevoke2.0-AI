@@ -140,8 +140,10 @@ namespace Revoke
 	{
 		std::string AudioPath;
 
-		uint32_t BufferID;
-		uint32_t SourceID;
+		// 0 until a file is loaded. ShutDown() relies on that: an uninitialized id could name
+		// another component's source and delete it.
+		uint32_t BufferID = 0;
+		uint32_t SourceID = 0;
 
 
 		float  Pitch = 1.0f;
@@ -162,6 +164,9 @@ namespace Revoke
 
 		void SetPath(std::string audioPath)
 		{
+			// Free the previous sound first, or replacing it leaks its buffer and source.
+			ShutDown();
+
 			AudioPath = audioPath;
 			if (!AudioPath.empty())
 			{
@@ -171,8 +176,12 @@ namespace Revoke
 		}
 		void ShutDown()
 		{
-			AudioRenderer::RemoveSoundSource(SourceID);
-			AudioRenderer::RemoveSoundBuffer(BufferID);
+			if (SourceID)
+				AudioRenderer::RemoveSoundSource(SourceID);
+			if (BufferID)
+				AudioRenderer::RemoveSoundBuffer(BufferID);
+			SourceID = 0;
+			BufferID = 0;
 		}
 		void UpdateSource()
 		{

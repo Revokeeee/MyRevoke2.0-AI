@@ -1,114 +1,123 @@
 #include "ObjectsPannel.h"
 
+#include "AssetType.h"
+#include "EditorUI.h"
+
+#include "MyRevoke/ImGui/ImGuiLayer.h"
+#include "MyRevoke/ImGui/ImGuiTheme.h"
+#include "MyRevoke/ImGui/ImGuiIcons.h"
+#include "MyRevoke/Renderer/Renderer2D.h"
+
 #include "imgui.h"
 
 #include <glm/gtc/type_ptr.hpp>
 
 namespace Revoke
 {
-
-	struct TempData
+	namespace
 	{
-		std::string CurrentScriptName = "Script";
-		std::string CurrentTextureName = "Texture";
-		std::string CurrentSoundName = "Sound";
-
-		void MakeDefault()
+		std::string FileNameOf(const std::string& path)
 		{
-			CurrentScriptName = "Script";
-			CurrentTextureName = "Texture";
-			CurrentSoundName = "Sound";
-		}
-	};
-
-	static TempData s_TempData;
-
-	namespace Utils
-	{
-		static bool IsPayloadTexture(const wchar_t* path) {
-			if (path == nullptr) {
-				return false;
-			}
-
-			const wchar_t* pngExtension = L".png";
-			const wchar_t* jpgExtension = L".jpg";
-			size_t pathLen = wcslen(path);
-			size_t pngExtLen = wcslen(pngExtension);
-			size_t jpgExtLen = wcslen(jpgExtension);
-
-			if (pathLen >= pngExtLen) {
-				const wchar_t* pathPngExtension = path + pathLen - pngExtLen;
-				if (wcscmp(pathPngExtension, pngExtension) == 0) {
-					return true;
-				}
-			}
-
-			if (pathLen >= jpgExtLen) {
-				const wchar_t* pathJpgExtension = path + pathLen - jpgExtLen;
-				if (wcscmp(pathJpgExtension, jpgExtension) == 0) {
-					return true;
-				}
-			}
-
-			return false;
+			if (path.empty())
+				return {};
+			auto name = std::filesystem::path(path).filename().u8string();
+			return std::string(name.begin(), name.end());
 		}
 
-		static bool IsPayloadAudio(const wchar_t* path) {
-			if (path == nullptr) {
-				return false;
-			}
+		bool IsTexture(const std::filesystem::path& path) { return GetAssetType(path) == AssetType::Texture; }
+		bool IsAudio(const std::filesystem::path& path) { return GetAssetType(path) == AssetType::Audio; }
+		bool IsScript(const std::filesystem::path& path) { return GetAssetType(path) == AssetType::Script; }
 
-			const wchar_t* pngExtension = L".wov";
-			const wchar_t* jpgExtension = L".ogg";
-			size_t pathLen = wcslen(path);
-			size_t pngExtLen = wcslen(pngExtension);
-			size_t jpgExtLen = wcslen(jpgExtension);
+		// Frees what a component holds outside the registry before it is removed or reset.
+		template<typename T>
+		void ReleaseComponent(Scene&, Entity) {}
 
-			if (pathLen >= pngExtLen) {
-				const wchar_t* pathPngExtension = path + pathLen - pngExtLen;
-				if (wcscmp(pathPngExtension, pngExtension) == 0) {
-					return true;
-				}
-			}
-
-			if (pathLen >= jpgExtLen) {
-				const wchar_t* pathJpgExtension = path + pathLen - jpgExtLen;
-				if (wcscmp(pathJpgExtension, jpgExtension) == 0) {
-					return true;
-				}
-			}
-
-			return false;
+		template<>
+		void ReleaseComponent<SoundComponent>(Scene&, Entity entity)
+		{
+			entity.GetComponent<SoundComponent>().ShutDown();
 		}
 
-		static bool IsPayloadScript(const wchar_t* path) {
-			if (path == nullptr) {
-				return false;
-			}
-
-			const wchar_t* pngExtension = L".cpp";
-			const wchar_t* jpgExtension = L".h";
-			size_t pathLen = wcslen(path);
-			size_t pngExtLen = wcslen(pngExtension);
-			size_t jpgExtLen = wcslen(jpgExtension);
-
-			if (pathLen >= pngExtLen) {
-				const wchar_t* pathPngExtension = path + pathLen - pngExtLen;
-				if (wcscmp(pathPngExtension, pngExtension) == 0) {
-					return true;
-				}
-			}
-
-			if (pathLen >= jpgExtLen) {
-				const wchar_t* pathJpgExtension = path + pathLen - jpgExtLen;
-				if (wcscmp(pathJpgExtension, jpgExtension) == 0) {
-					return true;
-				}
-			}
-
-			return false;
+		template<>
+		void ReleaseComponent<NativeScriptComponent>(Scene& scene, Entity entity)
+		{
+			scene.DestroyScriptInstance(entity);
 		}
 
+		// One collapsible section per component: a bold header with a settings menu, then the
+		// component's fields in a label | value table.
+		template<typename T, typename DrawFunction>
+		void DrawComponent(const char* name, const char* icon, Entity entity, Scene& scene, bool removable, DrawFunction draw)
+		{
+			if (!entity.HasComponent<T>())
+				return;
+
+			ImGui::PushID(typeid(T).name());
+
+			const float scale = ImGuiLayer::GetUIScale();
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.0f * scale, 5.0f * scale));
+			ImGui::PushStyleColor(ImGuiCol_Header, Theme::Surface);
+			ImGui::PushStyleColor(ImGuiCol_HeaderHovered, Theme::SurfaceHovered);
+			ImGui::PushStyleColor(ImGuiCol_HeaderActive, Theme::SurfaceActive);
+			ImGui::PushFont(ImGuiLayer::GetFont(FontStyle::Bold));
+
+			const ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_SpanAvailWidth
+				| ImGuiTreeNodeFlags_AllowOverlap | ImGuiTreeNodeFlags_FramePadding | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+			bool open = ImGui::TreeNodeEx("##header", flags, "%s  %s", icon, name);
+			const float headerHeight = ImGui::GetItemRectSize().y;
+			const ImVec2 belowHeader = ImGui::GetCursorPos();
+
+			ImGui::PopFont();
+			ImGui::PopStyleColor(3);
+			ImGui::PopStyleVar();
+
+			// Settings button over the right end of the header. Put the cursor back afterwards so
+			// the button doesn't push the fields down.
+			ImGui::SameLine(ImGui::GetWindowContentRegionMax().x - headerHeight);
+			if (UI::IconButton(RV_ICON_MORE, "Component settings", ImVec2(headerHeight, headerHeight)))
+				ImGui::OpenPopup("ComponentSettings");
+			ImGui::SetCursorPos(belowHeader);
+
+			bool reset = false;
+			bool remove = false;
+			if (ImGui::BeginPopup("ComponentSettings"))
+			{
+				if (ImGui::MenuItem(RV_ICON_REFRESH "  Reset"))
+					reset = true;
+				if (ImGui::MenuItem(RV_ICON_DELETE "  Remove Component", nullptr, false, removable))
+					remove = true;
+				ImGui::EndPopup();
+			}
+
+			if (open)
+			{
+				if (UI::BeginProperties("##properties"))
+				{
+					draw(entity.GetComponent<T>());
+					UI::EndProperties();
+				}
+			}
+			ImGui::Spacing();
+
+			// After drawing, so the fields above never see a component that is gone.
+			if (reset || remove)
+			{
+				ReleaseComponent<T>(scene, entity);
+				entity.RemoveComponent<T>();
+				if (reset)
+					entity.AddComponent<T>();
+			}
+
+			ImGui::PopID();
+		}
+
+		template<typename T>
+		void AddComponentMenuItem(Entity entity, const char* label)
+		{
+			bool alreadyAdded = entity.HasComponent<T>();
+			if (ImGui::MenuItem(label, alreadyAdded ? RV_ICON_CHECK : nullptr, false, !alreadyAdded))
+				entity.AddComponent<T>();
+		}
 	}
 
 	ObjectsPannel::ObjectsPannel(Shared<Scene> currentScene)
@@ -120,7 +129,6 @@ namespace Revoke
 	{
 		m_CurrentScene = currentScene;
 		m_SelectedEntity = {};
-		s_TempData.MakeDefault();
 	}
 
 	void ObjectsPannel::OnImGuiRender()
@@ -144,9 +152,9 @@ namespace Revoke
 				}
 				ImGui::EndPopup();
 			}
-		
+
 		}
-	
+
 		ImGui::End();
 
 		ImGui::Begin("Properties");
@@ -193,349 +201,181 @@ namespace Revoke
 	}
 	void ObjectsPannel::PropertiesWindow()
 	{
-		if (m_SelectedEntity)
+		if (!m_SelectedEntity)
 		{
-			if (m_SelectedEntity.HasComponent<NameComponent>())
+			UI::EmptyState(RV_ICON_SLIDERS, "Select an entity to edit its components.");
+			return;
+		}
+
+		Scene& scene = *m_CurrentScene;
+		Entity entity = m_SelectedEntity;
+
+		// Name and id
+		if (entity.HasComponent<NameComponent>())
+		{
+			auto& name = entity.GetComponent<NameComponent>().Name;
+
+			char buffer[256];
+			std::snprintf(buffer, sizeof(buffer), "%s", name.c_str());
+			ImGui::PushFont(ImGuiLayer::GetFont(FontStyle::Bold));
+			ImGui::SetNextItemWidth(-FLT_MIN);
+			if (ImGui::InputTextWithHint("##Name", "Entity name", buffer, sizeof(buffer)))
+				name = buffer;
+			ImGui::PopFont();
+		}
+		if (entity.HasComponent<IdComponent>())
+		{
+			ImGui::PushStyleColor(ImGuiCol_Text, Theme::TextDisabled);
+			ImGui::Text("ID  %llu", (unsigned long long)(uint64_t)entity.GetComponent<IdComponent>().ID);
+			ImGui::PopStyleColor();
+		}
+		ImGui::Spacing();
+
+		DrawComponent<TransformComponent>("Transform", RV_ICON_MOVE, entity, scene, false, [](TransformComponent& transform)
 			{
-				auto& name = m_SelectedEntity.GetComponent<NameComponent>().Name;
+				UI::PropertyVec3("Position", transform.Position);
 
-				char buffer[256];
-				memset(buffer, 0, sizeof(buffer));
-				strcpy_s(buffer, 256, name.c_str());
-				if (ImGui::InputText("Name", buffer, sizeof(buffer)))
-				{
-					name = std::string(buffer);
-				}
-			}
+				// Stored in radians; people think in degrees.
+				glm::vec3 rotation = glm::degrees(transform.Rotation);
+				if (UI::PropertyVec3("Rotation", rotation, 0.0f, 1.0f))
+					transform.Rotation = glm::radians(rotation);
 
-		
+				UI::PropertyVec3("Scale", transform.Scale, 1.0f, 0.05f);
+			});
 
-			if (m_SelectedEntity.HasComponent<TransformComponent>())
+		DrawComponent<SpriteRendererComponent>("Sprite Renderer", RV_ICON_IMAGE, entity, scene, true, [this](SpriteRendererComponent& sprite)
 			{
-				if (ImGui::TreeNodeEx((void*)typeid(TransformComponent).hash_code(), ImGuiTreeNodeFlags_DefaultOpen, "Transform"))
+				UI::PropertyColor(sprite.Texture2D.empty() ? "Color" : "Tint", sprite.Color);
+
+				uint32_t preview = sprite.Texture2D.empty() ? 0 : Renderer2D::GetTexture(sprite.Texture2D)->GetID();
+				std::filesystem::path dropped;
+				switch (UI::PropertyAsset("Texture", RV_ICON_IMAGE, FileNameOf(sprite.Texture2D), sprite.Texture2D, IsTexture, dropped, preview))
 				{
-					auto& transformComponent = m_SelectedEntity.GetComponent<TransformComponent>();
-
-					ImGui::DragFloat3("Position", glm::value_ptr(transformComponent.Position), 0.1f);
-					ImGui::DragFloat3("Rotation", glm::value_ptr(transformComponent.Rotation), 0.1f);
-					ImGui::DragFloat3("Scale", glm::value_ptr(transformComponent.Scale), 0.1f);
-
-					ImGui::TreePop();
+				case UI::AssetFieldResult::Dropped: sprite.Texture2D = (m_AssetsDirectory / dropped).string(); break;
+				case UI::AssetFieldResult::Cleared: sprite.Texture2D.clear(); break;
+				default: break;
 				}
-			}
-			if (m_SelectedEntity.HasComponent<SpriteRendererComponent>())
+			});
+
+		DrawComponent<CameraComponent>("Camera", RV_ICON_CAMERA, entity, scene, true, [](CameraComponent& cameraComponent)
 			{
-				if (ImGui::TreeNodeEx((void*)typeid(SpriteRendererComponent).hash_code(), ImGuiTreeNodeFlags_DefaultOpen, "Color"))
+				auto& camera = cameraComponent.Camera;
+
+				UI::PropertyBool("Primary", cameraComponent.isMain, "Play mode renders through the primary camera.");
+
+				const char* projections[] = { "Perspective", "Orthographic" };
+				int projection = (int)camera.GetProjectionType();
+				if (UI::PropertyCombo("Projection", projection, projections, 2))
+					camera.SetProjectionType((SceneCamera::Projection)projection);
+
+				if (camera.GetProjectionType() == SceneCamera::Projection::Perspective)
 				{
-					auto& spriteComponent = m_SelectedEntity.GetComponent<SpriteRendererComponent>();
-					ImGui::ColorEdit4("Color", glm::value_ptr(spriteComponent.Color));
+					float fov = glm::degrees(camera.GetPerspFOV());
+					if (UI::PropertyFloat("Field of View", fov, 0.1f, 1.0f, 179.0f, "%.1f°"))
+						camera.SetPerspFOV(glm::radians(fov));
 
-					ImGui::Button(s_TempData.CurrentTextureName.c_str());
+					float nearClip = camera.GetPerspNearClip();
+					if (UI::PropertyFloat("Near Clip", nearClip, 0.01f))
+						camera.SetPerspNearClip(nearClip);
 
-					if (ImGui::BeginDragDropTarget())
-					{
-						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_PAYLOAD"))
-						{
-							const wchar_t* path = (const wchar_t*)payload->Data;
-							std::filesystem::path texturePath = m_AssetsDirectory / path;
-
-							if (Utils::IsPayloadTexture(path))
-							{
-								s_TempData.CurrentTextureName = texturePath.stem().string();
-								spriteComponent.Texture2D = texturePath.string();
-							}
-							else
-							{
-								RV_EDITOR_ERROR("Wrong Texture File");
-							}
-
-						}
-
-						ImGui::EndDragDropTarget();
-					}
-
-					ImGui::TreePop();
+					float farClip = camera.GetPerspFarClip();
+					if (UI::PropertyFloat("Far Clip", farClip, 1.0f))
+						camera.SetPerspFarClipl(farClip);
 				}
-			}
-			if (m_SelectedEntity.HasComponent<SoundComponent>())
+				else
+				{
+					float size = camera.GetOrthoSize();
+					if (UI::PropertyFloat("Size", size, 0.1f, 0.01f, 10000.0f, "%.2f", "Height of the view in world units."))
+						camera.SetOrthoSize(size);
+
+					float nearClip = camera.GetOrthoNearClip();
+					if (UI::PropertyFloat("Near Clip", nearClip, 0.01f))
+						camera.SetOrthoNearClip(nearClip);
+
+					float farClip = camera.GetOrthoFarClip();
+					if (UI::PropertyFloat("Far Clip", farClip, 0.01f))
+						camera.SetOrthoFarClipl(farClip);
+				}
+
+				UI::PropertyBool("Fixed Aspect Ratio", cameraComponent.FixedAspectRatio, "Keep the aspect ratio when the viewport is resized.");
+			});
+
+		DrawComponent<RigidBodyComponent>("Rigid Body", RV_ICON_BOLT, entity, scene, true, [](RigidBodyComponent& body)
 			{
-				if (ImGui::TreeNodeEx((void*)typeid(SoundComponent).hash_code(), ImGuiTreeNodeFlags_DefaultOpen, "Sound Settings"))
-				{
-					auto& soundComponent = m_SelectedEntity.GetComponent<SoundComponent>();
+				const char* bodyTypes[] = { "Static", "Kinematic", "Dynamic" };
+				int type = (int)body.Type;
+				if (UI::PropertyCombo("Body Type", type, bodyTypes, 3))
+					body.Type = (RigidBodyComponent::BodyType)type;
 
-					ImGui::Button(s_TempData.CurrentSoundName.c_str());
+				UI::PropertyBool("Fixed Rotation", body.IsRotating, "Stop collisions from rotating the body.");
+			});
 
-					if (ImGui::BeginDragDropTarget())
-					{
-						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_PAYLOAD"))
-						{
-							const wchar_t* path = (const wchar_t*)payload->Data;
-							std::filesystem::path soundPath = m_AssetsDirectory / path;
-
-							if (Utils::IsPayloadAudio(path))
-							{
-								s_TempData.CurrentSoundName = soundPath.stem().string();
-								soundComponent.SetPath(soundPath.string());
-							}
-							else
-							{
-								RV_EDITOR_ERROR("Wrong Audio File");
-							}
-
-						}
-						ImGui::EndDragDropTarget();
-					}
-					ImGui::DragFloat("Pitch", &soundComponent.Pitch, 0.1f);
-					ImGui::DragFloat("Gain", &soundComponent.Gain, 0.1f);
-					ImGui::DragFloat3("Position", glm::value_ptr(soundComponent.Position), 0.1f);
-					ImGui::DragFloat3("Velocity", glm::value_ptr(soundComponent.Velocity), 0.1f);
-
-					//TODO: Maybe add on propertiesUpdate
-
-					ImGui::Checkbox("Loop Audio", &soundComponent.LoopSound);
-
-
-					ImGui::TreePop();
-				}
-			}
-			if (m_SelectedEntity.HasComponent<RigidBodyComponent>())
+		DrawComponent<BoxCollisionComponent>("Box Collider", RV_ICON_FRAME, entity, scene, true, [](BoxCollisionComponent& collider)
 			{
-				if (ImGui::TreeNodeEx((void*)typeid(RigidBodyComponent).hash_code(), ImGuiTreeNodeFlags_DefaultOpen, "Rigid Body"))
-				{
-					auto& bodyComponent = m_SelectedEntity.GetComponent<RigidBodyComponent>();
+				UI::PropertyVec2("Size", collider.Size, 0.5f, 0.05f);
+				UI::PropertyVec2("Offset", collider.Offset, 0.0f, 0.05f);
+				UI::PropertyFloat("Density", collider.Density, 0.01f, 0.0f, 100.0f);
+				UI::PropertyFloat("Friction", collider.Friction, 0.01f, 0.0f, 1.0f);
+				UI::PropertyFloat("Restitution", collider.Restriction, 0.01f, 0.0f, 1.0f, "%.3f", "Bounciness: 0 never bounces, 1 bounces back at full speed.");
+				UI::PropertyFloat("Restitution Threshold", collider.ResitutionTreshhold, 0.01f, 0.0f, 100.0f, "%.2f", "Hits slower than this (m/s) don't bounce.");
+				UI::PropertyBool("Sensor", collider.isSensor, "Detects overlaps without colliding.");
+			});
 
-					const char* bodyType[] = { "StaticBody",  "KinematicBody", "DynamicBody" };
-					const char* currentBodyType = bodyType[(int)bodyComponent.Type];
-
-					if (ImGui::BeginCombo("Body Type", currentBodyType))
-					{
-						for (int i = 0; i < 3; i++)
-						{
-							bool isSelected = currentBodyType == bodyType[i];
-							if (ImGui::Selectable(bodyType[i], isSelected))
-							{
-								currentBodyType = bodyType[i];
-								bodyComponent.Type = (RigidBodyComponent::BodyType)i;
-							}
-							if (isSelected)
-								ImGui::SetItemDefaultFocus();
-						}
-
-						ImGui::EndCombo();
-					}
-					ImGui::Checkbox("Fixed Rotation", &bodyComponent.IsRotating);
-
-					ImGui::TreePop();
-				}
-			}
-
-			if (m_SelectedEntity.HasComponent<BoxCollisionComponent>())
+		DrawComponent<NativeScriptComponent>("Native Script", RV_ICON_CODE, entity, scene, true, [&scene, entity](NativeScriptComponent& script)
 			{
-				if (ImGui::TreeNodeEx((void*)typeid(BoxCollisionComponent).hash_code(), ImGuiTreeNodeFlags_DefaultOpen, "Colisions"))
+				std::filesystem::path dropped;
+				switch (UI::PropertyAsset("Script", RV_ICON_CODE, script.scriptClassName, "Drop a .cpp or .h file. Its file name is the script's class name.", IsScript, dropped))
 				{
-					auto& boxCollisionComponent = m_SelectedEntity.GetComponent<BoxCollisionComponent>();
-
-					ImGui::DragFloat2("Size", glm::value_ptr(boxCollisionComponent.Size), 0.1f);
-					ImGui::DragFloat2("Offset", glm::value_ptr(boxCollisionComponent.Offset), 0.1f);
-
-					ImGui::DragFloat("Density", &boxCollisionComponent.Density, 0.01f, 0.0f, 1.0f);
-					ImGui::DragFloat("Friction", &boxCollisionComponent.Friction, 0.01f, 0.0f, 1.0f);
-					ImGui::DragFloat("Restriction", &boxCollisionComponent.Restriction, 0.01f, 0.0f, 1.0f);
-					ImGui::DragFloat("Resitution Treshhold", &boxCollisionComponent.ResitutionTreshhold, 0.01f, 0.0f);
-
-					ImGui::Checkbox("Sensor", &boxCollisionComponent.isSensor);
-
-					ImGui::TreePop();
+				case UI::AssetFieldResult::Dropped:
+				{
+					scene.DestroyScriptInstance(entity);
+					auto className = dropped.stem().u8string();
+					script.scriptClassName = std::string(className.begin(), className.end());
+					break;
 				}
-			}
+				case UI::AssetFieldResult::Cleared:
+					scene.DestroyScriptInstance(entity);
+					script.scriptClassName.clear();
+					break;
+				default: break;
+				}
+			});
 
-			if (m_SelectedEntity.HasComponent<NativeScriptComponent>())
+		DrawComponent<SoundComponent>("Sound", RV_ICON_VOLUME, entity, scene, true, [this](SoundComponent& sound)
 			{
-				if (ImGui::TreeNodeEx((void*)typeid(NativeScriptComponent).hash_code(), ImGuiTreeNodeFlags_DefaultOpen, "Scripts"))
+				std::filesystem::path dropped;
+				switch (UI::PropertyAsset("Audio Clip", RV_ICON_MUSIC, FileNameOf(sound.AudioPath), sound.AudioPath, IsAudio, dropped))
 				{
-					auto& nativeScriptComponent = m_SelectedEntity.GetComponent<NativeScriptComponent>();
-					
-					ImGui::Button(s_TempData.CurrentScriptName.c_str());
-
-					if (ImGui::BeginDragDropTarget())
-					{
-						if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_PAYLOAD"))
-						{
-							const wchar_t* path = (const wchar_t*)payload->Data;
-							std::filesystem::path scriptName = path;
-
-							if (Utils::IsPayloadScript(path))
-							{
-								s_TempData.CurrentScriptName = scriptName.stem().string();
-								nativeScriptComponent.scriptClassName = s_TempData.CurrentScriptName;
-								nativeScriptComponent.Instance = nullptr;
-							}
-
-							else
-							{
-								RV_EDITOR_ERROR("Wrong Script File");
-							}
-						}
-
-						ImGui::EndDragDropTarget();
-					}
-
-					ImGui::SameLine();
-					if (ImGui::Button("X", ImVec2(20, 20))) {
-						s_TempData.CurrentScriptName = "Script";
-						nativeScriptComponent.scriptClassName.clear();
-						nativeScriptComponent.Instance = nullptr;
-					}
-				
-					ImGui::TreePop();
-				}
-			}
-
-			if (m_SelectedEntity.HasComponent<CameraComponent>())
-			{
-				if (ImGui::TreeNodeEx((void*)typeid(CameraComponent).hash_code(), ImGuiTreeNodeFlags_DefaultOpen, "Camera"))
-				{
-					auto& cameraComponent = m_SelectedEntity.GetComponent<CameraComponent>();
-
-					ImGui::Checkbox("Primary", &cameraComponent.isMain);
-
-
-					const char* projectionType[] = { "3D Camera", "2D Camera" };
-					const char* currentProjectionType = projectionType[(int)cameraComponent.Camera.GetProjectionType()];
-
-					if (ImGui::BeginCombo("Camera Type", currentProjectionType))
-					{
-						for (int i = 0; i < 2; i++)
-						{
-							bool isSelected = currentProjectionType == projectionType[i];
-							if (ImGui::Selectable(projectionType[i], isSelected))
-							{
-								currentProjectionType = projectionType[i];
-								cameraComponent.Camera.SetProjectionType((SceneCamera::Projection)i);
-							}
-							if (isSelected)
-								ImGui::SetItemDefaultFocus();
-						}
-
-						ImGui::EndCombo();
-					}
-
-					if (cameraComponent.Camera.GetProjectionType() == SceneCamera::Projection::Perspective)
-					{
-						float FOV = glm::degrees(cameraComponent.Camera.GetPerspFOV());
-						if (ImGui::DragFloat("FOV", &FOV))
-							cameraComponent.Camera.SetPerspFOV(glm::radians(FOV));
-
-						float nearClip = cameraComponent.Camera.GetPerspNearClip();
-						if (ImGui::DragFloat("Near Clip", &nearClip))
-							cameraComponent.Camera.SetPerspNearClip(nearClip);
-
-						float farClip = cameraComponent.Camera.GetPerspFarClip();
-						if (ImGui::DragFloat("Far Clip", &farClip))
-							cameraComponent.Camera.SetPerspFarClipl(farClip);
-					}
-					if (cameraComponent.Camera.GetProjectionType() == SceneCamera::Projection::Orthographic)
-					{
-						float size = cameraComponent.Camera.GetOrthoSize();
-						if (ImGui::DragFloat("Size", &size))
-							cameraComponent.Camera.SetOrthoSize(size);
-
-						float nearClip = cameraComponent.Camera.GetOrthoNearClip();
-						if (ImGui::DragFloat("Near Clip", &nearClip))
-							cameraComponent.Camera.SetOrthoNearClip(nearClip);
-
-						float farClip = cameraComponent.Camera.GetOrthoFarClip();
-						if (ImGui::DragFloat("Far Clip", &farClip))
-							cameraComponent.Camera.SetOrthoFarClipl(farClip);
-
-					}
-					ImGui::TreePop();
-				}
-			}
-
-
-			if (ImGui::Button("Add Component"))
-				ImGui::OpenPopup("Add Component");
-
-			//TODO add all components
-
-			if (ImGui::BeginPopup("Add Component"))
-			{
-				if (ImGui::MenuItem("Sprite Renderer"))
-				{
-					if (!m_SelectedEntity.HasComponent<SpriteRendererComponent>())
-					{
-						m_SelectedEntity.AddComponent<SpriteRendererComponent>();
-					}
-					else
-					{
-						RV_EDITOR_WARN("Component Already Exists");
-					}
-					ImGui::CloseCurrentPopup();
-				}
-				if (ImGui::MenuItem("Rigid Body"))
-				{
-					if (!m_SelectedEntity.HasComponent<RigidBodyComponent>())
-					{
-					m_SelectedEntity.AddComponent<RigidBodyComponent>();
-					}
-					else
-					{
-						RV_EDITOR_WARN("Component Already Exists");
-					}
-					ImGui::CloseCurrentPopup();
-				}
-				if (ImGui::MenuItem("Box Colidor"))
-				{
-					if (!m_SelectedEntity.HasComponent<BoxCollisionComponent>())
-					{
-					m_SelectedEntity.AddComponent<BoxCollisionComponent>();
-					}
-					else
-					{
-						RV_EDITOR_WARN("Component Already Exists");
-					}
-					ImGui::CloseCurrentPopup();
-				}
-				if (ImGui::MenuItem("Sound Component"))
-				{
-					if (!m_SelectedEntity.HasComponent<SoundComponent>())
-					{
-					m_SelectedEntity.AddComponent<SoundComponent>();
-					}
-					else
-					{
-						RV_EDITOR_WARN("Component Already Exists");
-					}
-					ImGui::CloseCurrentPopup();
+				case UI::AssetFieldResult::Dropped: sound.SetPath((m_AssetsDirectory / dropped).string()); break;
+				case UI::AssetFieldResult::Cleared: sound.ShutDown(); sound.AudioPath.clear(); break;
+				default: break;
 				}
 
-				if (ImGui::MenuItem("Camera"))
-				{
-					if (!m_SelectedEntity.HasComponent<CameraComponent>())
-					{
-					m_SelectedEntity.AddComponent<CameraComponent>();
-					}
-					else
-					{
-						RV_EDITOR_WARN("Component Already Exists");
-					}
-					ImGui::CloseCurrentPopup();
-				}
-				if (ImGui::MenuItem("Native Script Component"))
-				{
-					if (!m_SelectedEntity.HasComponent<NativeScriptComponent>())
-					{
-					m_SelectedEntity.AddComponent<NativeScriptComponent>();
-					}
-					else
-					{
-						RV_EDITOR_WARN("Component Already Exists");
-					}
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::EndPopup();
-			}
+				UI::PropertyFloat("Pitch", sound.Pitch, 0.01f, 0.0f, 10.0f);
+				UI::PropertyFloat("Gain", sound.Gain, 0.01f, 0.0f, 10.0f);
+				UI::PropertyVec3("Position", sound.Position);
+				UI::PropertyVec3("Velocity", sound.Velocity);
+				UI::PropertyBool("Loop", sound.LoopSound);
+			});
+
+		// Add Component
+		ImGui::Spacing();
+		const float buttonWidth = ImGui::GetContentRegionAvail().x;
+		if (ImGui::Button(RV_ICON_ADD "  Add Component", ImVec2(buttonWidth, 0.0f)))
+			ImGui::OpenPopup("AddComponent");
+
+		// Drop the menu down from the button rather than wherever the mouse happens to be.
+		ImGui::SetNextWindowPos(ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMax().y + ImGui::GetStyle().ItemSpacing.y * 0.5f), ImGuiCond_Appearing);
+		ImGui::SetNextWindowSize(ImVec2(buttonWidth, 0.0f));
+		if (ImGui::BeginPopup("AddComponent"))
+		{
+			AddComponentMenuItem<SpriteRendererComponent>(entity, RV_ICON_IMAGE "  Sprite Renderer");
+			AddComponentMenuItem<CameraComponent>(entity, RV_ICON_CAMERA "  Camera");
+			AddComponentMenuItem<RigidBodyComponent>(entity, RV_ICON_BOLT "  Rigid Body");
+			AddComponentMenuItem<BoxCollisionComponent>(entity, RV_ICON_FRAME "  Box Collider");
+			AddComponentMenuItem<NativeScriptComponent>(entity, RV_ICON_CODE "  Native Script");
+			AddComponentMenuItem<SoundComponent>(entity, RV_ICON_VOLUME "  Sound");
+			ImGui::EndPopup();
 		}
 	}
 	void ObjectsPannel::SetSelectedEntity(Entity entity)
