@@ -119,7 +119,9 @@ namespace Revoke
                 auto& boxColidor = entity.GetComponent<BoxCollisionComponent>();
 
                 b2PolygonShape shape;
-                shape.SetAsBox(transforms.Scale.x * boxColidor.Size.x, transforms.Scale.y * boxColidor.Size.y);
+                // The offset was never applied, so editing it in the Properties panel did nothing.
+                b2Vec2 offset(transforms.Scale.x * boxColidor.Offset.x, transforms.Scale.y * boxColidor.Offset.y);
+                shape.SetAsBox(transforms.Scale.x * boxColidor.Size.x, transforms.Scale.y * boxColidor.Size.y, offset, 0.0f);
 
                 b2FixtureDef fixture;
                 fixture.shape = &shape;
@@ -189,7 +191,11 @@ namespace Revoke
                 auto& rigitBody = entity.GetComponent<RigidBodyComponent>();
                 auto& transforms = entity.GetComponent<TransformComponent>();
 
+                // Bodies are created in OnRuntimeStart, so one added from the Properties panel
+                // while playing has none yet.
                 b2Body* body = rigitBody.Body;
+                if (!body)
+                    continue;
                 const auto& pos = body->GetPosition();
 
                 transforms.Position.x = pos.x;
@@ -302,7 +308,25 @@ namespace Revoke
     }
     void Scene::RemoveEntity(Entity ent)
     {
-       m_Registry.destroy(ent);
+        if (ent.HasComponent<SoundComponent>())
+            ent.GetComponent<SoundComponent>().ShutDown();
+        DestroyScriptInstance(ent);
+
+        m_Registry.destroy(ent);
+    }
+
+    void Scene::DestroyScriptInstance(Entity entity)
+    {
+        if (!entity.HasComponent<NativeScriptComponent>())
+            return;
+
+        auto& nsc = entity.GetComponent<NativeScriptComponent>();
+        if (!nsc.Instance)
+            return;
+
+        nsc.Instance->OnDestroy();
+        delete nsc.Instance;
+        nsc.Instance = nullptr;
     }
 
     void Scene::OnSceneClose()

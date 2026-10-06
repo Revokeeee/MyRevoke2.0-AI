@@ -43,7 +43,10 @@ namespace Revoke
 
 			void OnViewportResize(uint32_t width, uint32_t height);
 
+			// Also frees what the entity's components hold outside the registry (sound, script instance).
 			void RemoveEntity(Entity ent);
+			// Calls OnDestroy on the entity's running script, if it has one, and frees it.
+			void DestroyScriptInstance(Entity entity);
 
 			void SetName(std::string name) { m_Name = name; }
 			std::string GetName() { return m_Name; }

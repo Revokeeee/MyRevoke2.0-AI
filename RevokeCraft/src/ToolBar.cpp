@@ -1,6 +1,7 @@
 #include "rvpch.h"
 
 #include "ToolBar.h"
+#include "EditorUI.h"
 
 #include "MyRevoke/ImGui/ImGuiLayer.h"
 #include "MyRevoke/ImGui/ImGuiTheme.h"
@@ -12,17 +13,6 @@ namespace Revoke
 {
 	namespace
 	{
-		void Tooltip(const char* text)
-		{
-			if (!ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_NoSharedDelay))
-				return;
-
-			// The buttons use the large icon font; the tooltip should not.
-			ImGui::PushFont(ImGuiLayer::GetFont(FontStyle::Regular));
-			ImGui::SetTooltip("%s", text);
-			ImGui::PopFont();
-		}
-
 		// A square icon button. Active buttons get the accent so the current tool is obvious.
 		bool ToolButton(const char* icon, const char* tooltip, bool active, float size)
 		{
@@ -43,7 +33,7 @@ namespace Revoke
 
 			bool pressed = ImGui::Button(icon, ImVec2(size, size));
 			ImGui::PopStyleColor(4);
-			Tooltip(tooltip);
+			UI::Tooltip(tooltip);
 			return pressed;
 		}
 

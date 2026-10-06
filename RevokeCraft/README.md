@@ -15,7 +15,9 @@ single `CraftLayer`, and implements the `Revoke::CreateApplication()` factory re
 | File | Draws | Talks to |
 |---|---|---|
 | `CraftLayer.h`/`.cpp` | Dockspace, menu bar, viewport, gizmo manipulation | Owns the `Scene`, `EditorCamera`, framebuffer (for mouse picking via `ReadPixel`), and all the other panels; scene file I/O via `Serializer`/`FileExplorer` |
-| `ObjectsPannel.h`/`.cpp` *(sic — "Panel")* | "Scene Hierarchy" + "Properties" | Iterates `Scene`'s registry, per-component property editors, "Add Component" popup |
+| `ObjectsPannel.h`/`.cpp` *(sic — "Panel")* | "Scene Hierarchy" + "Properties" | Iterates `Scene`'s registry; one collapsible section per component (`DrawComponent<T>`) with Reset/Remove, and an "Add Component" menu |
+| `EditorUI.h`/`.cpp` | Shared widgets | Label/value property rows (`UI::Property*`), X/Y/Z fields, asset drop fields, search box, icon buttons, tooltips |
+| `AssetType.h` | — | Maps a file extension to an `AssetType` and its icon; the Content Browser drag-and-drop payload name |
 | `ContentBrowser.h`/`.cpp` | "Content Browser" | Icon grid over the open project's assets tree; drag-and-drop source for textures/audio/scripts |
 | `SceneSettingsPannel.h`/`.cpp` *(sic)* | "Scene Settings" | Clear color, blending toggle, physics iteration counts, "Build Scripts" (`msbuild` on `MyRevoke-NativeScriptCore`; not in `Dist` builds) |
 | `ToolBar.h`/`.cpp` | Gizmo tools (Q/W/E/R), local/world and snap toggles, Play/Stop (Ctrl+P) | Owns the gizmo state `CraftLayer` reads; calls back into `CraftLayer` to start/stop play mode |
@@ -52,8 +54,6 @@ started from any working directory.
   uses `sizeof(sceneName)` (the pointer size, 8 bytes) instead of the buffer's real length.
 - `SceneSettingsPannel.cpp` shells out via `system("msbuild ...")` to rebuild native scripts — Windows-
   only and echoes a hardcoded path.
-- `ObjectsPannel.cpp`'s audio drag-drop payload check compares against extension `L".wov"`, almost
-  certainly meant to be `.wav`.
 - The example project ships inside the editor's own folder, so saving a scene in it writes to the
   install folder. Only user projects created elsewhere stay out of it.
 - `premake5.lua` compiles native scripts from the example project's `assets/Scripts` only, so scripts
