@@ -154,7 +154,13 @@ jobs:
             Now address the findings from the review you just posted on PR
             #${{ steps.find-pr.outputs.pr_number }}.
 
-            For each finding:
+            For each finding, first verify it again before touching code:
+            re-read the surrounding code and callers, and confirm the concrete
+            failure scenario actually happens. If it doesn't hold up, leave it.
+            After fixing, read your `git diff` back and confirm the scenario is
+            gone and no caller breaks; revert the fix if not.
+
+            Then:
             - If it's a real, fixable issue within the scope of this PR, fix it.
             - If you're not confident it's a genuine issue, or fixing it is out
               of scope for this PR, leave it - do not guess.
