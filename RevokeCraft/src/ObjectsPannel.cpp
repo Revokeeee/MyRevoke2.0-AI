@@ -20,8 +20,7 @@ namespace Revoke
 		{
 			if (path.empty())
 				return {};
-			auto name = std::filesystem::path(path).filename().u8string();
-			return std::string(name.begin(), name.end());
+			return std::filesystem::path(path).filename().string();
 		}
 
 		bool IsTexture(const std::filesystem::path& path) { return GetAssetType(path) == AssetType::Texture; }
@@ -329,8 +328,7 @@ namespace Revoke
 				case UI::AssetFieldResult::Dropped:
 				{
 					scene.DestroyScriptInstance(entity);
-					auto className = dropped.stem().u8string();
-					script.scriptClassName = std::string(className.begin(), className.end());
+					script.scriptClassName = dropped.stem().string();
 					break;
 				}
 				case UI::AssetFieldResult::Cleared:
