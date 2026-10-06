@@ -342,12 +342,23 @@ jobs:
           # Without a start time the lookups would scan all of history and list
           # unrelated old PRs/issues as this run's output, so skip them.
           run_lookups() {
-          # Paginated: other PRs opened after $start could push this run's PR
-          # off the first page.
-          if ! prs="$(gh api --paginate "repos/$REPO/pulls?state=all&sort=created&direction=desc&per_page=100" \
-            --jq ".[] | select(.user.login == \"$bot\" and .created_at >= \"$start\" and ($refs)) | \"- PR #\(.number): \(.html_url)\"")"; then
-            lookup_failed=1; prs=""
-          fi
+          # Newest first, page by page, stopping at the first page that reaches
+          # back past $start - so other PRs opened during the run can't push
+          # this run's PR off page 1, and old history is never walked. (Search
+          # would be one call, but its index lags and can miss a fresh PR.)
+          page=1
+          while :; do
+            if ! page_json="$(gh api "repos/$REPO/pulls?state=all&sort=created&direction=desc&per_page=100&page=$page")"; then
+              lookup_failed=1; prs=""; break
+            fi
+            if ! matches="$(jq -r ".[] | select(.user.login == \"$bot\" and .created_at >= \"$start\" and ($refs)) | \"- PR #\(.number): \(.html_url)\"" <<< "$page_json")" \
+              || ! last_page="$(jq "length < 100 or (last.created_at < \"$start\")" <<< "$page_json")"; then
+              lookup_failed=1; prs=""; break
+            fi
+            [ -n "$matches" ] && prs="${prs:+$prs$'\n'}$matches"
+            [ "$last_page" = "true" ] && break
+            page=$((page + 1))
+          done
           if ! issues="$(gh api --paginate --method GET "repos/$REPO/issues" -f state=all -f creator="$bot" -f since="$start" -f per_page=100 \
             --jq ".[] | select(.pull_request == null and .created_at >= \"$start\" and ($refs)) | \"- Issue #\(.number): \(.html_url)\"")"; then
             lookup_failed=1; issues=""
