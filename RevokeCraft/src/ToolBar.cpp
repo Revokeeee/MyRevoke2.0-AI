@@ -61,17 +61,18 @@ namespace Revoke
 	}
 	void ToolBar::OnScenePlay()
 	{	
-		m_CurrentScene->OnRuntimeStart();
+		m_OnPlay();
 		m_SceneState = SceneState::Runtime;
 	}
 	void ToolBar::OnSceneStop()
 	{
-		m_CurrentScene->OnRuntimeStop();
+		m_OnStop();
 		m_SceneState = SceneState::Editor;
 	}
-	void ToolBar::SetScene(Shared<Scene> currentScene)
+	void ToolBar::SetPlayCallbacks(std::function<void()> onPlay, std::function<void()> onStop)
 	{
-		m_CurrentScene = currentScene;
+		m_OnPlay = onPlay;
+		m_OnStop = onStop;
 	}
 	void ToolBar::SetGuizmo(int* guizmo)
 	{

@@ -334,6 +334,12 @@ workspace "MyRevoke"
             "MyRevoke"
         }
 
+        -- Tests that touch the scene load the audio code, so the exe needs OpenAL32.dll beside it.
+        postbuildcommands
+        {
+            '{COPYFILE} "%{wks.location}MyRevoke/vendor/OpenALBuild/lib/%{cfg.buildcfg}/OpenAL32.dll" "%{cfg.targetdir}"'
+        }
+
         filter "system:windows"
             systemversion "latest"
 
