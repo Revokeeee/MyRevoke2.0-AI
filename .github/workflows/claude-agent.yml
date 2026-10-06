@@ -332,31 +332,47 @@ jobs:
           # agent run on another issue can't be mistaken for this run's output.
           refs="(.body // \"\") | test(\"#$NUMBER([^0-9]|$)\")"
 
-          prs="$(gh api "repos/$REPO/pulls?state=all&sort=created&direction=desc&per_page=50" \
-            --jq ".[] | select(.user.login == \"$bot\" and .created_at >= \"$start\" and ($refs)) | \"- PR #\(.number): \(.html_url)\"" || true)"
-          issues="$(gh api "repos/$REPO/issues?state=all&creator=github-actions%5Bbot%5D&since=$start&per_page=50" \
-            --jq ".[] | select(.pull_request == null and .created_at >= \"$start\" and ($refs)) | \"- Issue #\(.number): \(.html_url)\"" || true)"
-          comments="$(gh api --paginate "repos/$REPO/issues/$NUMBER/comments?since=$start" \
-            --jq "[.[] | select(.user.login == \"$bot\")] | length" | awk '{s+=$1} END {print s+0}' || true)"
+          # A failed lookup must not read as "the agent produced nothing", so
+          # track it separately and say so instead.
+          lookup_failed=0
+
+          if ! prs="$(gh api "repos/$REPO/pulls?state=all&sort=created&direction=desc&per_page=50" \
+            --jq ".[] | select(.user.login == \"$bot\" and .created_at >= \"$start\" and ($refs)) | \"- PR #\(.number): \(.html_url)\"")"; then
+            lookup_failed=1; prs=""
+          fi
+          if ! issues="$(gh api --method GET "repos/$REPO/issues" -f state=all -f creator="$bot" -f since="$start" -f per_page=50 \
+            --jq ".[] | select(.pull_request == null and .created_at >= \"$start\" and ($refs)) | \"- Issue #\(.number): \(.html_url)\"")"; then
+            lookup_failed=1; issues=""
+          fi
+          if ! comments="$(gh api --paginate "repos/$REPO/issues/$NUMBER/comments?since=$start" \
+            --jq "[.[] | select(.user.login == \"$bot\")] | length" | awk '{s+=$1} END {print s+0}')"; then
+            lookup_failed=1; comments=0
+          fi
           pushed=""
           if [ "$IS_PR" = "true" ]; then
-            pushed="$(gh pr view "$NUMBER" --repo "$REPO" --json commits \
-              --jq ".commits[] | select(.committedDate >= \"$start\") | .oid" | head -1 || true)"
+            if ! pushed="$(gh pr view "$NUMBER" --repo "$REPO" --json commits \
+              --jq "[.commits[] | select(.committedDate >= \"$start\")] | length")"; then
+              lookup_failed=1; pushed=0
+            fi
           fi
 
-          produced=""
-          [ -n "$prs" ] && produced="$produced"$'\n'"$prs"
-          [ -n "$issues" ] && produced="$produced"$'\n'"$issues"
-          [ -n "$pushed" ] && produced="$produced"$'\n'"- Pushed new commits to this PR"
+          produced=()
+          [ -n "$prs" ] && produced+=("$prs")
+          [ -n "$issues" ] && produced+=("$issues")
+          [ "${pushed:-0}" -gt 0 ] && produced+=("- Pushed new commits to this PR")
 
+          nothing=0
           case "$JOB_STATUS" in
             cancelled) headline="**Agent run was cancelled** before it finished." ;;
             failure)   headline="**Agent run failed.**" ;;
             *)
-              if [ -n "$produced" ]; then
+              if [ "${#produced[@]}" -gt 0 ]; then
                 headline="**Agent run finished.**"
               elif [ "${comments:-0}" -gt 0 ]; then
                 headline="**Agent run finished** without a PR or new issue - see its comment above."
+              elif [ "$lookup_failed" = "1" ]; then
+                headline="**Agent run finished**, but checking what it produced failed (GitHub API error). Check the run log and this issue's PRs before rerunning."
+                nothing=1
               else
                 headline="**Agent run finished without producing anything** (no PR, issue, commit or comment). The task was not done."
                 nothing=1
@@ -364,13 +380,14 @@ jobs:
               ;;
           esac
 
-          body="$headline"
-          [ -n "$produced" ] && body="$body"$'\n'"$produced"
-          body="$body"$'\n\n'"Run log: $RUN_URL"
-          printf '%s\n' "$body" > "$RUNNER_TEMP/agent-status.md"
+          {
+            printf '%s\n' "$headline"
+            [ "${#produced[@]}" -gt 0 ] && printf '%s\n' "${produced[@]}"
+            printf '\nRun log: %s\n' "$RUN_URL"
+          } > "$RUNNER_TEMP/agent-status.md"
           gh issue comment "$NUMBER" --repo "$REPO" --body-file "$RUNNER_TEMP/agent-status.md"
 
-          if [ "${nothing:-0}" = "1" ]; then
-            echo "::error::Agent ended without producing a PR, issue, commit or comment."
+          if [ "$nothing" = "1" ]; then
+            echo "::error::$headline"
             exit 1
           fi
