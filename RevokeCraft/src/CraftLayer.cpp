@@ -159,9 +159,11 @@ namespace Revoke
 		ImGuiID leftId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Left, 0.21f, nullptr, &centerId);
 
 		// The toolbar should stay a fixed strip, so size it in pixels rather than as a share of the window.
+		// Capped at half so a very short window still leaves room for the Viewport.
 		const float toolbarHeight = 32.0f;
 		float centerHeight = ImGui::DockBuilderGetNode(centerId)->Size.y;
-		ImGuiID toolbarId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Up, toolbarHeight / centerHeight, nullptr, &centerId);
+		float toolbarRatio = ImMin(toolbarHeight / centerHeight, 0.5f);
+		ImGuiID toolbarId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Up, toolbarRatio, nullptr, &centerId);
 
 		ImGui::DockBuilderDockWindow("Scene Settings", settingsId);
 		ImGui::DockBuilderDockWindow("Properties", propertiesId);
