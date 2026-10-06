@@ -17,7 +17,7 @@ single `CraftLayer`, and implements the `Revoke::CreateApplication()` factory re
 | `CraftLayer.h`/`.cpp` | Dockspace, menu bar, viewport, gizmo manipulation | Owns the `Scene`, `EditorCamera`, framebuffer (for mouse picking via `ReadPixel`), and all the other panels; scene file I/O via `Serializer`/`FileExplorer` |
 | `ObjectsPannel.h`/`.cpp` *(sic — "Panel")* | "Scene Hierarchy" + "Properties" | Iterates `Scene`'s registry, per-component property editors, "Add Component" popup |
 | `ContentBrowser.h`/`.cpp` | "Content Browser" | Icon grid over the open project's assets tree; drag-and-drop source for textures/audio/scripts |
-| `SceneSettingsPannel.h`/`.cpp` *(sic)* | "Scene Settings" | Clear color, blending toggle, physics iteration counts, "Build Scripts" (`msbuild` on `MyRevoke-NativeScriptCore`) |
+| `SceneSettingsPannel.h`/`.cpp` *(sic)* | "Scene Settings" | Clear color, blending toggle, physics iteration counts, "Build Scripts" (`msbuild` on `MyRevoke-NativeScriptCore`; not in `Dist` builds) |
 | `ToolBar.h`/`.cpp` | Play/Stop + gizmo mode (Q/W/E/R) toolbar | `Scene::OnRuntimeStart`/`OnRuntimeStop`, writes into a shared gizmo-type pointer |
 
 `CraftLayer` owns all four panels as plain members (composition, not polymorphism); `OnAttach()` wires
