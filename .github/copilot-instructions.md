@@ -8,7 +8,7 @@ deliberately experimental. Unfinished features, rough edges, and messy design
 choices are expected and are often intentional — they are not defects to report.
 
 Stack: C++20, OpenGL (GLAD), ImGui, Box2D, Mono/.NET scripting, OpenAL +
-libsndfile, YAML serialization, Premake5 generating VS2022 solutions.
+libsndfile, YAML serialization, Premake5 generating Visual Studio solutions.
 
 ## What to review
 
@@ -68,7 +68,7 @@ Committed build output (`bin/`, `bin-int/`, `.vs/`, `*.obj`, `*.lib`, `*.pdb`,
   though the codebase is not fully consistent — follow the surrounding file.
 - Prefer `std::unique_ptr` / `std::shared_ptr` over raw owning pointers, but raw
   non-owning pointers and references are fine and used widely.
-- Build is Premake5 → `GenerateProject.bat` → VS2022 solution. There is no
+- Build is Premake5 → `GenerateProject.bat` → Visual Studio solution (2026 by default). There is no
   headless/CI build, so do not assume compilation was verified.
 
 ## Calibration
