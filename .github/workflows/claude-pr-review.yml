@@ -74,7 +74,14 @@ jobs:
           # Review-only runs never get the tools to edit or push.
           tools="Read,Write,Grep,Glob,Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr review:*)"
           if [ "$FIX" = "true" ]; then
-            tools="$tools,Edit,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(git rev-parse:*)"
+            # The reviewer reads untrusted PR content, so push is allowed only as
+            # this one exact command: no other remote, ref, or --force. The branch
+            # name goes into that rule, so reject names that could break out of it.
+            if ! [[ "$branch" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+              echo "::error::Branch name '$branch' has characters not allowed in the push rule."
+              exit 1
+            fi
+            tools="$tools,Edit,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git add:*),Bash(git commit:*),Bash(git push origin HEAD:$branch),Bash(git rev-parse:*)"
           fi
           {
             echo "number=$PR_NUMBER"
