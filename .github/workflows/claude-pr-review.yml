@@ -39,6 +39,7 @@ jobs:
           submodules: recursive
 
       - name: Claude Code Review
+        id: review
         # Pinned to the commit v1 pointed to on 2026-09-06, not the mutable
         # @v1 tag - an upstream change to that tag can't silently alter
         # what runs here with our API key. Bump deliberately.
@@ -87,3 +88,19 @@ jobs:
             rejects approving or requesting changes on your own PR. Start the
             body with a one-line verdict ("No issues found." or "N issues
             found."), so it's clear the review ran even when it's short.
+
+            After posting, write the file `${{ runner.temp }}/review-verdict.txt`
+            containing exactly `PASS` if you found no issues, or `FAIL` if you
+            found one or more. The next step reads it to fail the check.
+
+      # `gh pr review --comment` can't block a PR, so the job would otherwise
+      # be green even with findings. Fail it here instead; a missing or
+      # unrecognised verdict also fails (fail closed).
+      - name: Fail if review found issues
+        if: always() && steps.review.conclusion == 'success'
+        run: |
+          verdict="$(tr -d '[:space:]' < "${{ runner.temp }}/review-verdict.txt" 2>/dev/null || true)"
+          if [ "$verdict" != "PASS" ]; then
+            echo "::error::Claude review found issues or produced no verdict (got '${verdict}'). See the PR review comment."
+            exit 1
+          fi
