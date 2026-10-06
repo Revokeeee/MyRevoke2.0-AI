@@ -41,7 +41,7 @@ namespace Revoke
 		void NewScene();
 		void OpenScene();
 		void OpenScene(const std::filesystem::path& path);
-		// Both return false when nothing was saved (no project, or the dialog was cancelled).
+		// Both return false when nothing was saved (no project, dialog cancelled, or the write failed).
 		bool SaveAs();
 		bool Save();
 
@@ -57,7 +57,7 @@ namespace Revoke
 		std::string SerializeScene();
 		void MarkSceneSaved();
 		bool HasUnsavedChanges();
-		void WriteScene(const std::filesystem::path& file);
+		bool WriteScene(const std::filesystem::path& file);
 		bool SaveBeforeClosing();
 		void DrawSavePrompt();
 
@@ -76,6 +76,7 @@ namespace Revoke
 		std::string m_SavedSceneState;
 		std::filesystem::path m_ScenePath;
 		bool m_ShowSavePrompt = false;
+		bool m_LastSaveFailed = false;
 
 		Entity m_CameraEntity;
 		Entity m_SecondCamera;

@@ -481,18 +481,14 @@ namespace Revoke
 		if (path.empty())
 			return false;
 
-		WriteScene(path + ".myrevoke");
-		return true;
+		return WriteScene(path + ".myrevoke");
 	}
 
 	bool CraftLayer::Save()
 	{
 		// A scene that came from, or was already saved to, a file goes back to that file.
 		if (!m_ScenePath.empty())
-		{
-			WriteScene(m_ScenePath);
-			return true;
-		}
+			return WriteScene(m_ScenePath);
 
 		if (!m_Project)
 		{
@@ -503,19 +499,29 @@ namespace Revoke
 		std::filesystem::path scenesDirectory = m_Project->GetScenesDirectory();
 		std::filesystem::create_directories(scenesDirectory);
 
-		WriteScene(scenesDirectory / (m_Scene->GetName() + ".myrevoke"));
-		return true;
+		return WriteScene(scenesDirectory / (m_Scene->GetName() + ".myrevoke"));
 	}
 
-	void CraftLayer::WriteScene(const std::filesystem::path& file)
+	bool CraftLayer::WriteScene(const std::filesystem::path& file)
 	{
 		// Serialize once and keep that text as the saved snapshot; this is what Serializer::Serealize
 		// does, minus a second pass over the scene.
 		std::string text = SerializeScene();
-		std::ofstream(file) << text;
+		std::ofstream out(file);
+		out << text;
+		out.close();
+
+		// A failed write must not count as saved, or the close prompt would never warn about it.
+		m_LastSaveFailed = out.fail();
+		if (m_LastSaveFailed)
+		{
+			RV_EDITOR_ERROR("Could not write the scene to {}", file.string());
+			return false;
+		}
 
 		m_SavedSceneState = text;
 		m_ScenePath = file;
+		return true;
 	}
 
 	std::string CraftLayer::SerializeScene()
@@ -556,6 +562,7 @@ namespace Revoke
 		{
 			ImGui::OpenPopup("Save changes?");
 			m_ShowSavePrompt = false;
+			m_LastSaveFailed = false;
 		}
 
 		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
@@ -563,14 +570,15 @@ namespace Revoke
 			return;
 
 		ImGui::Text("Save changes to \"%s\" before closing?", m_Scene->GetName().c_str());
+		if (m_LastSaveFailed)
+			ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Could not save the scene. See the log.");
 		ImGui::Spacing();
 
 		if (ImGui::Button("Save"))
 		{
-			// A cancelled Save As dialog keeps the editor open, same as Cancel.
+			// A failed or cancelled save leaves this prompt open instead of losing the changes.
 			if (SaveBeforeClosing())
 				Application::Get().Close();
-			ImGui::CloseCurrentPopup();
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Don't Save"))
