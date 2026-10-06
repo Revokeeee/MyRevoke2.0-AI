@@ -71,7 +71,11 @@ jobs:
           fetch-depth: 0
           submodules: recursive
 
+      - name: Record agent start time
+        run: echo "AGENT_START=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
       - name: Claude Code Action
+        id: agent
         # Pinned to the commit v1 pointed to on 2026-09-06, not the mutable
         # @v1 tag - an upstream change to that tag can't silently alter
         # what runs here with our write access + API key. Bump deliberately.
@@ -200,6 +204,13 @@ jobs:
             actually writing the code. Skip this for anything already small
             enough that delegating it would cost more than it saves.
 
+            Always run subagents in the foreground (`run_in_background: false`)
+            and wait for their result in the same turn. This is a one-shot
+            headless run: the moment you end your turn the job exits and any
+            background work is lost - nothing will ever wake you up again. Never
+            end your turn to "wait for a notification"; only end it once the PR,
+            issue(s) or failure comment exists.
+
             ## How to write the code
 
             The simplest thing that actually solves the stated problem, and
@@ -292,3 +303,63 @@ jobs:
 
             You never merge pull requests, and you never approve them - a
             human always makes that call.
+
+      # The agent only reports on the issue when it decides to, so a run that
+      # stops early (failure, cancel, or ending its turn before finishing)
+      # used to leave the issue silent while the job showed green. Always
+      # post the outcome here, and fail the job if the agent produced nothing.
+      - name: Report outcome on the issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+          IS_PR: ${{ github.event.issue.pull_request != null }}
+          JOB_STATUS: ${{ job.status }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          start="${AGENT_START:-1970-01-01T00:00:00Z}"
+          bot='github-actions[bot]'
+
+          prs="$(gh api "repos/$REPO/pulls?state=all&sort=created&direction=desc&per_page=50" \
+            --jq ".[] | select(.user.login == \"$bot\" and .created_at >= \"$start\") | \"- PR #\(.number): \(.html_url)\"" || true)"
+          issues="$(gh api "repos/$REPO/issues?state=all&creator=github-actions%5Bbot%5D&since=$start&per_page=50" \
+            --jq ".[] | select(.pull_request == null and .created_at >= \"$start\") | \"- Issue #\(.number): \(.html_url)\"" || true)"
+          comments="$(gh api --paginate "repos/$REPO/issues/$NUMBER/comments?since=$start" \
+            --jq "[.[] | select(.user.login == \"$bot\")] | length" | awk '{s+=$1} END {print s+0}')"
+          pushed=""
+          if [ "$IS_PR" = "true" ]; then
+            pushed="$(gh pr view "$NUMBER" --repo "$REPO" --json commits \
+              --jq ".commits[] | select(.committedDate >= \"$start\") | .oid" | head -1 || true)"
+          fi
+
+          produced=""
+          [ -n "$prs" ] && produced="$produced"$'\n'"$prs"
+          [ -n "$issues" ] && produced="$produced"$'\n'"$issues"
+          [ -n "$pushed" ] && produced="$produced"$'\n'"- Pushed new commits to this PR"
+
+          case "$JOB_STATUS" in
+            cancelled) headline="**Agent run was cancelled** before it finished." ;;
+            failure)   headline="**Agent run failed.**" ;;
+            *)
+              if [ -n "$produced" ]; then
+                headline="**Agent run finished.**"
+              elif [ "${comments:-0}" -gt 0 ]; then
+                headline="**Agent run finished** without a PR or new issue - see its comment above."
+              else
+                headline="**Agent run finished without producing anything** (no PR, issue, commit or comment). The task was not done."
+                nothing=1
+              fi
+              ;;
+          esac
+
+          body="$headline"
+          [ -n "$produced" ] && body="$body"$'\n'"$produced"
+          body="$body"$'\n\n'"Run log: $RUN_URL"
+          printf '%s\n' "$body" > "$RUNNER_TEMP/agent-status.md"
+          gh issue comment "$NUMBER" --repo "$REPO" --body-file "$RUNNER_TEMP/agent-status.md"
+
+          if [ "${nothing:-0}" = "1" ]; then
+            echo "::error::Agent ended without producing a PR, issue, commit or comment."
+            exit 1
+          fi
