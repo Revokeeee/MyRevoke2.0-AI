@@ -30,6 +30,13 @@ namespace Revoke
 			
 			Entity CreateEntity(const std::string name = std::string());
 			Entity CreateEntity(UUID id, const std::string name = std::string());
+			// A new entity (with a new id) holding copies of the source's components.
+			Entity DuplicateEntity(Entity source);
+
+			// Every entity, oldest first. The hierarchy and the scene file both use this order, so a
+			// save and reload keeps it.
+			std::vector<Entity> GetEntities();
+			size_t GetEntityCount();
 
 			// Returns an empty Entity when no entity has this id.
 			Entity FindEntityByUUID(UUID id);
@@ -43,7 +50,14 @@ namespace Revoke
 
 			void OnViewportResize(uint32_t width, uint32_t height);
 
+			// Also frees what the entity's components hold outside the registry (sound, script instance).
 			void RemoveEntity(Entity ent);
+			// Calls OnDestroy on the entity's running script, if it has one, and frees it.
+			void DestroyScriptInstance(Entity entity);
+			// While playing: take the entity's body (and its collider with it) out of the physics
+			// world, or only its collider. For removing those components; no-ops outside play mode.
+			void DestroyPhysicsBody(Entity entity);
+			void DestroyCollider(Entity entity);
 
 			void SetName(std::string name) { m_Name = name; }
 			std::string GetName() { return m_Name; }
@@ -63,6 +77,9 @@ namespace Revoke
 		void OnComponentAdded(Entity entity, T& component);
 	private:
 		entt::registry m_Registry;
+		// Live entities in creation order. The registry's own storage can't be used for this:
+		// destroying an entity moves the last one into its slot.
+		std::vector<entt::entity> m_EntityOrder;
 		uint32_t m_ViewportWidth = 0, m_ViewportHeight = 0;
 		std::string m_Name = "Unnamed";
 

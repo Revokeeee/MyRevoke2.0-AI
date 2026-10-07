@@ -9,7 +9,11 @@ to/from YAML.
 
 - **`Scene.h`/`.cpp`** — owns `entt::registry m_Registry` (private; `Entity`, `ObjectsPannel`, and
   `Serializer` are `friend`s so they can reach into it directly). Drives `OnRuntimeStart/Update/Stop`
-  and creates/destroys entities.
+  and creates/destroys entities. `GetEntities()` lists them in creation order (kept in
+  `m_EntityOrder`, since the registry reorders its storage on deletion); the hierarchy and the
+  serializer both use it. `RemoveEntity` also releases the entity's script instance, OpenAL source
+  and Box2D body; `DestroyPhysicsBody`/`DestroyCollider` do the same for single components removed
+  while playing. `DuplicateEntity` copies an entity's components under a new id.
 - **`Entity.h`/`.cpp`** — a handle pairing an `entt::entity` with a `Scene*`. Has no data of its own;
   `AddComponent`/`GetComponent`/`RemoveComponent`/`HasComponent` all forward to the owning `Scene`'s
   registry (the classic "entity is a handle, registry is the owner" pattern). `AddComponent` also
@@ -59,11 +63,8 @@ in the file. Custom `YAML::convert<>` specializations handle `glm::vec2/vec3/vec
 - Identifier typos remain in `Serializer`'s own methods, `Serealize`/`DeSerealize` ("Serialize"/
   "Deserialize"), and in `BoxCollisionComponent`'s fields `Restriction`/`ResitutionTreshhold`
   ("Restitution"/"Threshold").
-- `NativeScriptComponent::Instance` is never deleted — no `OnDestroy()` call site exists in this
-  module, and `Scene::RemoveEntity` just calls `m_Registry.destroy(ent)` without releasing the script
-  instance, the `b2Body`, or shutting down a `SoundComponent`'s OpenAL source — a resource leak /
-  dangling-body risk on entity deletion.
 - Component structs holding runtime handles (`RigidBodyComponent::Body`, `SoundComponent`'s buffer/
   source IDs) use defaulted copy constructors, so copying an entity's components would copy the raw
-  Box2D/OpenAL handles, risking a double-free/double-release.
+  Box2D/OpenAL handles, risking a double-free/double-release. `Scene::DuplicateEntity` resets them on
+  the copy; any other copy has to do the same.
 - `MusicComponent` is dead code (fully commented out) and could be removed.

@@ -6,25 +6,21 @@
 
 namespace Revoke
 {
-	
+
 	class SceneSettingsPannel
 	{
 	public:
-		SceneSettingsPannel();
-		~SceneSettingsPannel();
+		SceneSettingsPannel() = default;
 
 		void OnImGuiRender();
 
 		void SetScene(Shared<Scene> currentScene);
 
 	private:
-		int m_GravityPositionIteration = 4;
-		int GravityVelocityIteration = 6;
-
 		Shared<Scene> m_CurrentScene;
-		glm::vec3 m_ClearColor = { 0.2, 0.2, 0.2 };
-		bool m_EnebleBlending = true;
+
+		// Renderer state, not saved with the scene.
+		glm::vec3 m_ClearColor = { 0.2f, 0.2f, 0.2f };
+		bool m_EnableBlending = true;
 	};
 }
-
-

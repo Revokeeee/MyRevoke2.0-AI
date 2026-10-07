@@ -1,4 +1,5 @@
 #include "CraftLayer.h"
+#include "EditorUI.h"
 
 #include <chrono>
 #include <fstream>
@@ -12,28 +13,12 @@
 #include "MyRevoke/Core/Input.h"
 #include <ImGuizmo.h>
 #include <imgui_internal.h>
+#include "MyRevoke/ImGui/ImGuiIcons.h"
+#include "MyRevoke/ImGui/ImGuiTheme.h"
+#include "MyRevoke/ImGui/ImGuiLayer.h"
 
 namespace Revoke
 {
-	namespace Utils
-	{
-		static bool IsPayloadScene(const wchar_t* path) {
-			if (path == nullptr) {
-				return false;
-			}
-
-			const wchar_t* extension = L".myrevoke";
-			size_t pathLen = wcslen(path);
-			size_t extLen = wcslen(extension);
-
-			if (pathLen < extLen) {
-				return false;
-			}
-
-			const wchar_t* pathExtension = path + pathLen - extLen;
-			return wcscmp(pathExtension, extension) == 0;
-		}
-	}
 
 	CraftLayer::CraftLayer()
 		:Layer("CraftLayer")
@@ -59,10 +44,7 @@ namespace Revoke
 
 		SetPanelsScene(m_Scene);
 		m_ToolBar.SetPlayCallbacks([this]() { OnScenePlay(); }, [this]() { OnSceneStop(); });
-
-		m_GizmoType = new int(-1);
-
-		m_ToolBar.SetGuizmo(m_GizmoType);
+		m_ContentBrowserPanel.SetOpenSceneCallback([this](const std::filesystem::path& scene) { RunAfterSavePrompt([this, scene]() { OpenScene(scene); }); });
 
 		RendererAPI::SetClearColor({ 0.2f, 0.2f, 0.2f, 1.0f });
 		RendererAPI::EnableBlending();
@@ -72,7 +54,6 @@ namespace Revoke
 	}
 	void CraftLayer::OnDetach()
 	{
-		delete m_GizmoType;
 	}
 	void CraftLayer::OnUpdate(Timestep deltaTime)
 	{
@@ -90,8 +71,11 @@ namespace Revoke
 		}
 
 
+		// Per-frame numbers for the status bar.
+		Renderer2D::ResetStatistics();
+
 		m_FrameBuffer->Bind();
-		
+
 		RendererAPI::Clear();
 
 		m_FrameBuffer->ClearColorTextureAttachment(1, -1);
@@ -139,7 +123,7 @@ namespace Revoke
 	{
 		// A minimized window reports a zero size, which would make the splits below
 		// divide by zero. Skip it; the caller retries next frame.
-		ImVec2 viewportSize = ImGui::GetMainViewport()->Size;
+		ImVec2 viewportSize = ImGui::GetMainViewport()->WorkSize;
 		if (viewportSize.x <= 0.0f || viewportSize.y <= 0.0f)
 			return false;
 
@@ -150,9 +134,9 @@ namespace Revoke
 		// Full-height right column (Scene Settings over Properties); the rest is
 		// Hierarchy | toolbar-over-Viewport, with the Content Browser below them.
 		ImGuiID mainId = dockspaceId;
-		ImGuiID rightId = ImGui::DockBuilderSplitNode(mainId, ImGuiDir_Right, 0.13f, nullptr, &mainId);
+		ImGuiID rightId = ImGui::DockBuilderSplitNode(mainId, ImGuiDir_Right, 0.19f, nullptr, &mainId);
 		ImGuiID propertiesId = rightId;
-		ImGuiID settingsId = ImGui::DockBuilderSplitNode(propertiesId, ImGuiDir_Up, 0.22f, nullptr, &propertiesId);
+		ImGuiID settingsId = ImGui::DockBuilderSplitNode(propertiesId, ImGuiDir_Up, 0.3f, nullptr, &propertiesId);
 
 		ImGuiID centerId = mainId;
 		ImGuiID bottomId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Down, 0.21f, nullptr, &centerId);
@@ -160,7 +144,7 @@ namespace Revoke
 
 		// The toolbar should stay a fixed strip, so size it in pixels rather than as a share of the window.
 		// Capped at half so a very short window still leaves room for the Viewport.
-		const float toolbarHeight = 32.0f;
+		const float toolbarHeight = 36.0f * ImGuiLayer::GetUIScale();
 		ImGuiDockNode* centerNode = ImGui::DockBuilderGetNode(centerId);
 		RV_ASSERT(centerNode, "Default dock layout: Viewport node missing after split");
 		// RV_ASSERT compiles out in Release, so also bail out rather than crash. Return
@@ -176,6 +160,7 @@ namespace Revoke
 
 		ImGui::DockBuilderDockWindow("Scene Settings", settingsId);
 		ImGui::DockBuilderDockWindow("Properties", propertiesId);
+		ImGui::DockBuilderDockWindow("Console", bottomId);
 		ImGui::DockBuilderDockWindow("Content Browser", bottomId);
 		ImGui::DockBuilderDockWindow("Scene Hierarchy", leftId);
 		ImGui::DockBuilderDockWindow("##toolbar", toolbarId);
@@ -201,12 +186,17 @@ namespace Revoke
 		bool opt_fullscreen = opt_fullscreen_persistant;
 		static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None;
 
+		// Before the dockspace window, so the space it takes at the bottom is known this frame.
+		UpdateSceneStatus();
+		DrawStatusBar();
+
 		ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
 		if (opt_fullscreen)
 		{
+			// The work area is the viewport minus the status bar.
 			ImGuiViewport* viewport = ImGui::GetMainViewport();
-			ImGui::SetNextWindowPos(viewport->Pos);
-			ImGui::SetNextWindowSize(viewport->Size);
+			ImGui::SetNextWindowPos(viewport->WorkPos);
+			ImGui::SetNextWindowSize(viewport->WorkSize);
 			ImGui::SetNextWindowViewport(viewport->ID);
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
@@ -241,20 +231,43 @@ namespace Revoke
 		{
 			if (ImGui::BeginMenu("File"))
 			{
-				if (ImGui::MenuItem("Exit")) Application::Get().RequestClose();
-				if (ImGui::MenuItem("New Project")) NewProject();
-				if (ImGui::MenuItem("Open Project")) OpenProject();
-				if (ImGui::MenuItem("New Scene", "Ctrl+N")) NewScene();
-				if (ImGui::MenuItem("Open", "Ctrl+O")) OpenScene();
-				if (ImGui::MenuItem("Save", "Ctrl+S")) Save();
-				if (ImGui::MenuItem("Save as", "Ctrl+Shift+S")) SaveAs();
+				if (ImGui::MenuItem(RV_ICON_FILE_ADD "  New Scene", "Ctrl+N")) RunAfterSavePrompt([this]() { NewScene(); });
+				if (ImGui::MenuItem(RV_ICON_FOLDER_OPEN "  Open Scene...", "Ctrl+O")) OpenScene();
+				ImGui::Separator();
+				if (ImGui::MenuItem(RV_ICON_SAVE "  Save Scene", "Ctrl+S")) Save();
+				if (ImGui::MenuItem(RV_ICON_SAVE "  Save Scene As...", "Ctrl+Shift+S")) SaveAs();
+				ImGui::Separator();
+				if (ImGui::MenuItem(RV_ICON_FOLDER_ADD "  New Project...")) NewProject();
+				if (ImGui::MenuItem(RV_ICON_LIBRARY "  Open Project...")) OpenProject();
+				ImGui::Separator();
+				if (ImGui::MenuItem(RV_ICON_POWER "  Exit", "Alt+F4")) Application::Get().RequestClose();
+
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::BeginMenu("Edit"))
+			{
+				const bool hasSelection = (bool)m_ObjPannel.GetSelectedEntity();
+				if (ImGui::MenuItem(RV_ICON_PENCIL "  Rename", "F2", false, hasSelection)) m_ObjPannel.RenameSelectedEntity();
+				if (ImGui::MenuItem(RV_ICON_COPY "  Duplicate", "Ctrl+D", false, hasSelection)) m_ObjPannel.DuplicateSelectedEntity();
+				if (ImGui::MenuItem(RV_ICON_DELETE "  Delete", "Del", false, hasSelection)) m_ObjPannel.DeleteSelectedEntity();
+				ImGui::Separator();
+				const bool playing = m_ToolBar.GetSceneState() == SceneState::Runtime;
+				if (ImGui::MenuItem(playing ? RV_ICON_STOP "  Stop" : RV_ICON_PLAY "  Play", "Ctrl+P")) m_ToolBar.TogglePlay();
 
 				ImGui::EndMenu();
 			}
 
 			if (ImGui::BeginMenu("View"))
 			{
-				if (ImGui::MenuItem("Reset Layout")) m_ResetLayoutRequested = true;
+				if (ImGui::MenuItem(RV_ICON_TILES "  Reset Layout")) m_ResetLayoutRequested = true;
+
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::BeginMenu("Help"))
+			{
+				if (ImGui::MenuItem(RV_ICON_HELP "  Keyboard Shortcuts", "F1")) m_ShowShortcuts = true;
 
 				ImGui::EndMenu();
 			}
@@ -263,6 +276,8 @@ namespace Revoke
 		}
 
 		DrawSavePrompt();
+		DrawShortcutsWindow();
+		HandleShortcuts();
 
 		//-----------Settings-------------------------------------------------
 	
@@ -270,6 +285,7 @@ namespace Revoke
 		m_ObjPannel.OnImGuiRender();
 		m_ContentBrowserPanel.OnImGuiRender();
 		m_ProjectSettingsPanel.OnImGuiRender();
+		m_ConsolePanel.OnImGuiRender();
 		//-----------ViewPort-------------------------------------------------
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{ 0, 0 });
 		ImGui::Begin("Viewport");
@@ -292,19 +308,32 @@ namespace Revoke
 
 		ImGui::Image((void*)textureID, ImVec2{ m_ViewportSize.x, m_ViewportSize.y }, ImVec2{ 0, 1 }, ImVec2{ 1, 0 });
 
+		// Dropping a scene opens it; dropping an image adds a sprite showing it.
 		if (ImGui::BeginDragDropTarget())
 		{
-			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("CONTENT_BROWSER_PAYLOAD"))
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(ContentBrowserPayload, ImGuiDragDropFlags_AcceptBeforeDelivery | ImGuiDragDropFlags_AcceptNoDrawDefaultRect))
 			{
-				const wchar_t* path = (const wchar_t*)payload->Data;
+				std::filesystem::path path((const wchar_t*)payload->Data);
+				AssetType type = GetAssetType(path);
+				bool editing = m_ToolBar.GetSceneState() == SceneState::Editor;
+				bool accepted = type == AssetType::Scene || (type == AssetType::Texture && editing);
 
-				if (Utils::IsPayloadScene(path))
+				ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
+					ImGui::GetColorU32(accepted ? Theme::Accent : Theme::Error), 0.0f, 0, 3.0f * ImGuiLayer::GetUIScale());
+
+				if (accepted && payload->IsDelivery())
 				{
-					OpenScene(GetAssetsDirectory() / path);
-				}
-				else
-				{
-					RV_EDITOR_ERROR("Wrong Scene File");
+					if (type == AssetType::Scene)
+					{
+						std::filesystem::path scene = GetAssetsDirectory() / path;
+						RunAfterSavePrompt([this, scene]() { OpenScene(scene); });
+					}
+					else
+					{
+						Entity sprite = m_Scene->CreateEntity(path.stem().string());
+						sprite.AddComponent<SpriteRendererComponent>((GetAssetsDirectory() / path).string());
+						m_ObjPannel.SetSelectedEntity(sprite);
+					}
 				}
 			}
 
@@ -312,31 +341,50 @@ namespace Revoke
 		}
 		
 
+		// While playing, the viewport shows the scene's own camera, so a gizmo placed with the
+		// editor camera's matrices would not line up with anything. Outline the viewport instead,
+		// so play mode is obvious at a glance.
+		const bool playing = m_ToolBar.GetSceneState() == SceneState::Runtime;
+		if (playing)
+		{
+			ImGui::GetWindowDrawList()->AddRect(ImVec2(m_ViewportBounds[0].x, m_ViewportBounds[0].y), ImVec2(m_ViewportBounds[1].x, m_ViewportBounds[1].y),
+				ImGui::GetColorU32(Theme::Accent), 0.0f, 0, 2.0f * ImGuiLayer::GetUIScale());
+		}
+
 		//-----------Guizmo---------------------------------------------------
-		if (selectedEntity && *m_GizmoType != -1)
+		ImGuizmo::OPERATION gizmoOperation = ImGuizmo::TRANSLATE;
+		switch (m_ToolBar.GetGizmoTool())
+		{
+		case GizmoTool::Translate: gizmoOperation = ImGuizmo::TRANSLATE; break;
+		case GizmoTool::Rotate:    gizmoOperation = ImGuizmo::ROTATE; break;
+		case GizmoTool::Scale:     gizmoOperation = ImGuizmo::SCALE; break;
+		default: break;
+		}
+
+		if (selectedEntity && !playing && m_ToolBar.GetGizmoTool() != GizmoTool::Select)
 		{
 			ImGuizmo::SetOrthographic(false);
 			ImGuizmo::SetDrawlist();
 
 			ImGuizmo::SetRect(m_ViewportBounds[0].x, m_ViewportBounds[0].y, m_ViewportBounds[1].x - m_ViewportBounds[0].x, m_ViewportBounds[1].y - m_ViewportBounds[0].y);
 
-
-			auto mainCameraEntt = m_EditorCamera;
 			const glm::mat4& cameraProjection = m_EditorCamera.GetProjectionMatrix();
 			glm::mat4 cameraView = m_EditorCamera.GetViewMatrix();
 
 			auto& entityTransformsComponent = selectedEntity.GetComponent<TransformComponent>();
 			glm::mat4 tranforms = entityTransformsComponent.GetTransform();
-			
-			bool snap = Input::IsKeyPressed(RV_KEY_LEFT_CONTROL);
+
+			// The toolbar toggle turns snapping on; Ctrl flips it either way.
+			bool ctrlHeld = Input::IsKeyPressed(RV_KEY_LEFT_CONTROL) || Input::IsKeyPressed(RV_KEY_RIGHT_CONTROL);
+			bool snap = m_ToolBar.IsSnapEnabled() != ctrlHeld;
 			float snapValue = 0.5f;
-			if (*m_GizmoType == ImGuizmo::OPERATION::ROTATE)
+			if (gizmoOperation == ImGuizmo::ROTATE)
 				snapValue = 45.0f;
 
 			float snapValues[3] = { snapValue, snapValue, snapValue };
 
-		
-			ImGuizmo::Manipulate(glm::value_ptr(cameraView), glm::value_ptr(cameraProjection), (ImGuizmo::OPERATION)*m_GizmoType, ImGuizmo::LOCAL, glm::value_ptr(tranforms), nullptr, snap ? snapValues : nullptr);
+			ImGuizmo::MODE gizmoMode = m_ToolBar.IsGizmoLocal() ? ImGuizmo::LOCAL : ImGuizmo::WORLD;
+			ImGuizmo::Manipulate(glm::value_ptr(cameraView), glm::value_ptr(cameraProjection), gizmoOperation, gizmoMode, glm::value_ptr(tranforms), nullptr, snap ? snapValues : nullptr);
 
 			if (ImGuizmo::IsUsing() && !Input::IsKeyPressed(RV_KEY_LEFT_ALT))
 			{
@@ -350,21 +398,22 @@ namespace Revoke
 			}
 		}
 
-
-		m_ToolBar.OnImGuiRender();
-
 		ImGui::End();
 		ImGui::PopStyleVar();
+
+		m_ToolBar.OnImGuiRender();
 
 		ImGui::End();
 	}
 
 	void CraftLayer::OnEvent(Revoke::Event& e)
 	{
-		m_EditorCamera.OnEvent(e);
+		// The camera zooms on scroll. Events reach here while the viewport merely has focus too,
+		// so without this scrolling the Content Browser also zoomed the scene.
+		if (m_ViewportHovered)
+			m_EditorCamera.OnEvent(e);
 
 		EventDispatcher dispatcher(e);
-		dispatcher.Dispatch<KeyPressedEvent>(RV_BIND_EVENT_FUNK(CraftLayer::OnKeyPressed));
 		dispatcher.Dispatch<MouseButtonPressedEvent>(RV_BIND_EVENT_FUNK(CraftLayer::OnMouseBtnPressed));
 	}
 	bool CraftLayer::OnMouseBtnPressed(MouseButtonPressedEvent& e)
@@ -379,60 +428,50 @@ namespace Revoke
 		}
 		return false;
 	}
-	bool CraftLayer::OnKeyPressed(KeyPressedEvent& e)
+	void CraftLayer::HandleShortcuts()
 	{
-		switch (e.GetKeyCode())
+		// Read from ImGui rather than from key events: with keyboard navigation on, ImGui claims
+		// the keyboard whenever any panel has focus, so Ctrl+S only worked over the viewport.
+		// A text field or an open popup (the save prompt, a menu) keeps the keys to itself.
+		ImGuiIO& io = ImGui::GetIO();
+		if (io.WantTextInput || ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel))
+			return;
+
+		auto pressed = [](ImGuiKey key) { return ImGui::IsKeyPressed(key, false); };
+		const bool ctrl = io.KeyCtrl;
+
+		if (ctrl && pressed(ImGuiKey_S))
 		{
-		case RV_KEY_S:
-		{
-			if (Input::IsKeyPressed(RV_KEY_LEFT_CONTROL) && Input::IsKeyPressed(RV_KEY_LEFT_SHIFT))
-			{
+			if (io.KeyShift)
 				SaveAs();
-			}
-			else if (Input::IsKeyPressed(RV_KEY_LEFT_CONTROL))
-			{
+			else
 				Save();
-			}
-			break;
 		}
-		case RV_KEY_N:
+		if (ctrl && pressed(ImGuiKey_N))
+			RunAfterSavePrompt([this]() { NewScene(); });
+		if (ctrl && pressed(ImGuiKey_O))
+			OpenScene();
+		if (ctrl && pressed(ImGuiKey_P))
+			m_ToolBar.TogglePlay();
+		if (pressed(ImGuiKey_F1))
+			m_ShowShortcuts = !m_ShowShortcuts;
+
+		if (!ctrl && !io.KeyAlt)
 		{
-			if (Input::IsKeyPressed(RV_KEY_LEFT_CONTROL))
-			{
-				NewScene();
-			}
-			break;
+			if (pressed(ImGuiKey_Q)) m_ToolBar.SetGizmoTool(GizmoTool::Select);
+			if (pressed(ImGuiKey_W)) m_ToolBar.SetGizmoTool(GizmoTool::Translate);
+			if (pressed(ImGuiKey_E)) m_ToolBar.SetGizmoTool(GizmoTool::Rotate);
+			if (pressed(ImGuiKey_R)) m_ToolBar.SetGizmoTool(GizmoTool::Scale);
 		}
-		case RV_KEY_O:
+
+		// The hierarchy handles these itself while it has focus; here they cover the viewport.
+		if (m_ViewportFocused)
 		{
-			if (Input::IsKeyPressed(RV_KEY_LEFT_CONTROL))
-			{
-				OpenScene();
-			}
-			break;
+			if (pressed(ImGuiKey_Delete))
+				m_ObjPannel.DeleteSelectedEntity();
+			if (ctrl && pressed(ImGuiKey_D))
+				m_ObjPannel.DuplicateSelectedEntity();
 		}
-		case RV_KEY_Q:
-		{
-			*m_GizmoType = -1;
-			break;
-		}
-		case RV_KEY_W:
-		{
-			*m_GizmoType = ImGuizmo::OPERATION::TRANSLATE;
-			break;
-		}
-		case RV_KEY_E:
-		{
-			*m_GizmoType = ImGuizmo::OPERATION::ROTATE;
-			break;
-		}
-		case RV_KEY_R:
-		{
-			*m_GizmoType = ImGuizmo::OPERATION::SCALE;
-			break;
-		}
-		}
-		return false;
 	}
 
 	//------------------------------------------------------------------------
@@ -443,7 +482,7 @@ namespace Revoke
 		if (!path.empty())
 		{
 			std::filesystem::path chosenPath(path);
-			SetProject(Project::Create(chosenPath.stem().string(), chosenPath.parent_path()));
+			RunAfterSavePrompt([this, chosenPath]() { SetProject(Project::Create(chosenPath.stem().string(), chosenPath.parent_path())); });
 		}
 	}
 
@@ -453,7 +492,8 @@ namespace Revoke
 
 		if (!path.empty())
 		{
-			OpenProject(std::filesystem::path(path));
+			std::filesystem::path projectFile(path);
+			RunAfterSavePrompt([this, projectFile]() { OpenProject(projectFile); });
 		}
 	}
 
@@ -474,6 +514,12 @@ namespace Revoke
 
 	void CraftLayer::SetProject(Shared<Project> project)
 	{
+		if (!project)
+		{
+			RV_EDITOR_ERROR("Could not open the project");
+			return;
+		}
+
 		m_Project = project;
 		m_ContentBrowserPanel.SetAssetsDirectory(project->GetAssetsDirectory());
 		m_ObjPannel.SetAssetsDirectory(project->GetAssetsDirectory());
@@ -512,8 +558,11 @@ namespace Revoke
 	void CraftLayer::NewScene()
 	{
 		StopPlayingScene();
+		// Close the scene being replaced (this used to close the new, empty one, so the old
+		// scene's sounds were never freed).
+		if (m_Scene)
+			m_Scene->OnSceneClose();
 		m_Scene = std::make_shared<Scene>("New scene");
-		m_Scene->OnSceneClose();
 		m_Scene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
 		SetPanelsScene(m_Scene);
 
@@ -527,14 +576,16 @@ namespace Revoke
 
 		if (!path.empty())
 		{
-			OpenScene(path);
+			std::filesystem::path scene(path);
+			RunAfterSavePrompt([this, scene]() { OpenScene(scene); });
 		}
 	}
 	void CraftLayer::OpenScene(const std::filesystem::path& path)
 	{
 		StopPlayingScene();
+		if (m_Scene)
+			m_Scene->OnSceneClose();
 		m_Scene = std::make_shared<Scene>();
-		m_Scene->OnSceneClose();
 		m_Scene->OnViewportResize((uint32_t)m_ViewportSize.x, (uint32_t)m_ViewportSize.y);
 		
 		Serializer sceneSerializer(m_Scene, GetAssetsDirectory());
@@ -593,6 +644,8 @@ namespace Revoke
 
 		m_SavedSceneState = text;
 		m_ScenePath = file;
+		m_SceneModified = false;
+		RV_EDITOR_INFO("Saved the scene to {}", file.string());
 		return true;
 	}
 
@@ -605,6 +658,88 @@ namespace Revoke
 	void CraftLayer::MarkSceneSaved()
 	{
 		m_SavedSceneState = SerializeScene();
+		m_SceneModified = false;
+	}
+
+	void CraftLayer::UpdateSceneStatus()
+	{
+		if (ImGui::GetTime() - m_LastModifiedCheck > 0.5)
+		{
+			m_SceneModified = HasUnsavedChanges();
+			m_LastModifiedCheck = ImGui::GetTime();
+		}
+
+		// "Scene name* - Project - MyRevoke", like other editors, so the taskbar says what is open.
+		std::string title = m_Scene->GetName() + (m_SceneModified ? "*" : "");
+		if (m_Project)
+			title += " - " + m_Project->GetName();
+		title += " - MyRevoke";
+		Application::Get().GetWindow().SetTitle(title);
+	}
+
+	void CraftLayer::DrawStatusBar()
+	{
+		const float scale = ImGuiLayer::GetUIScale();
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f * scale, 4.0f * scale));
+		ImGui::PushStyleColor(ImGuiCol_MenuBarBg, Theme::BackgroundDark);
+		const ImGuiWindowFlags flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_MenuBar;
+		if (ImGui::BeginViewportSideBar("##StatusBar", ImGui::GetMainViewport(), ImGuiDir_Down, ImGui::GetFrameHeight(), flags))
+		{
+			if (ImGui::BeginMenuBar())
+			{
+				const ImVec4 separatorColor = Theme::TextDisabled;
+				auto separator = [&]() { ImGui::TextColored(separatorColor, "|"); };
+
+				// Mode
+				if (m_ToolBar.GetSceneState() == SceneState::Runtime)
+					ImGui::TextColored(Theme::Accent, RV_ICON_PLAY "  Playing");
+				else
+					ImGui::TextColored(Theme::TextMuted, RV_ICON_PENCIL "  Editing");
+				separator();
+
+				// Scene and whether it has unsaved changes
+				ImGui::TextColored(Theme::TextMuted, RV_ICON_GLOBE);
+				ImGui::TextUnformatted(m_Scene->GetName().c_str());
+				UI::Tooltip(m_ScenePath.empty() ? "Not saved to a file yet" : m_ScenePath.string().c_str());
+				if (m_SceneModified)
+				{
+					ImGui::TextColored(Theme::Warning, "Modified");
+					UI::Tooltip("Unsaved changes. Ctrl+S saves.");
+				}
+				separator();
+
+				// The latest log message; a click opens the console.
+				if (const LogEntry* latest = m_ConsolePanel.GetLatestEntry())
+				{
+					ImVec4 color = latest->Level >= spdlog::level::err ? Theme::Error : latest->Level == spdlog::level::warn ? Theme::Warning : Theme::TextMuted;
+					const char* icon = latest->Level >= spdlog::level::err ? RV_ICON_ERROR : latest->Level == spdlog::level::warn ? RV_ICON_WARNING : RV_ICON_INFO;
+					ImGui::PushStyleColor(ImGuiCol_Text, color);
+					ImGui::Text("%s  %s", icon, latest->Message.c_str());
+					ImGui::PopStyleColor();
+					if (ImGui::IsItemClicked())
+						ImGui::SetWindowFocus("Console");
+					UI::Tooltip("Click to open the Console");
+				}
+
+				// Stats, right-aligned
+				Renderer2D::Stats stats = Renderer2D::GetStats();
+				char statsText[128];
+				std::snprintf(statsText, sizeof(statsText), "%d entities   %u quads   %u draw calls   %.0f FPS",
+					(int)GetCurrentScene()->GetEntityCount(), stats.QuadCount, stats.DrawCalls, ImGui::GetIO().Framerate);
+				float statsWidth = ImGui::CalcTextSize(statsText).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+				float statsX = ImGui::GetWindowContentRegionMax().x - statsWidth;
+				if (statsX > ImGui::GetCursorPosX())
+				{
+					ImGui::SetCursorPosX(statsX);
+					ImGui::TextColored(Theme::TextMuted, "%s", statsText);
+				}
+
+				ImGui::EndMenuBar();
+			}
+		}
+		ImGui::End();
+		ImGui::PopStyleColor();
+		ImGui::PopStyleVar();
 	}
 
 	bool CraftLayer::HasUnsavedChanges()
@@ -624,8 +759,20 @@ namespace Revoke
 		if (!HasUnsavedChanges())
 			return true;
 
-		m_ShowSavePrompt = true;
+		RunAfterSavePrompt([]() { Application::Get().Close(); });
 		return false;
+	}
+
+	void CraftLayer::RunAfterSavePrompt(std::function<void()> action)
+	{
+		if (!HasUnsavedChanges())
+		{
+			action();
+			return;
+		}
+
+		m_PendingAction = std::move(action);
+		m_ShowSavePrompt = true;
 	}
 
 	void CraftLayer::DrawSavePrompt()
@@ -638,31 +785,107 @@ namespace Revoke
 		}
 
 		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-		if (!ImGui::BeginPopupModal("Save changes?", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		if (!ImGui::BeginPopupModal("Save changes?", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings))
 			return;
 
-		ImGui::Text("Save changes to \"%s\" before closing?", m_Scene->GetName().c_str());
+		ImGui::PushFont(ImGuiLayer::GetFont(FontStyle::Bold));
+		ImGui::TextColored(Theme::Warning, RV_ICON_WARNING);
+		ImGui::SameLine();
+		ImGui::Text("\"%s\" has unsaved changes.", m_Scene->GetName().c_str());
+		ImGui::PopFont();
+		ImGui::TextColored(Theme::TextMuted, "Save them first? Changes you don't save are lost.");
 		if (m_LastSaveFailed)
-			ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Could not save the scene. See the log.");
+			ImGui::TextColored(Theme::Error, RV_ICON_ERROR "  Could not save the scene. See the log.");
+		ImGui::Spacing();
 		ImGui::Spacing();
 
-		if (ImGui::Button("Save"))
+		const float buttonWidth = 110.0f * ImGuiLayer::GetUIScale();
+		const float spacing = ImGui::GetStyle().ItemSpacing.x;
+		// Right-align the buttons once the popup is wider than they are (it auto-sizes to fit them).
+		const float buttonsOffset = ImGui::GetContentRegionAvail().x - buttonWidth * 3.0f - spacing * 2.0f;
+		if (buttonsOffset > 0.0f)
+			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + buttonsOffset);
+
+		bool proceed = false;
+		ImGui::PushStyleColor(ImGuiCol_Button, Theme::Accent);
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, Theme::AccentHovered);
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, Theme::AccentActive);
+		ImGui::PushStyleColor(ImGuiCol_Text, Theme::BackgroundDark);
+		if (ImGui::Button(RV_ICON_SAVE "  Save", ImVec2(buttonWidth, 0.0f)))
 		{
 			// A failed or cancelled save leaves this prompt open instead of losing the changes.
-			if (SaveBeforeClosing())
-				Application::Get().Close();
+			proceed = SaveBeforeClosing();
 		}
+		ImGui::PopStyleColor(4);
 		ImGui::SameLine();
-		if (ImGui::Button("Don't Save"))
+		if (ImGui::Button("Don't Save", ImVec2(buttonWidth, 0.0f)))
+			proceed = true;
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel", ImVec2(buttonWidth, 0.0f)) || ImGui::IsKeyPressed(ImGuiKey_Escape, false))
 		{
-			Application::Get().Close();
+			m_PendingAction = nullptr;
 			ImGui::CloseCurrentPopup();
 		}
-		ImGui::SameLine();
-		if (ImGui::Button("Cancel"))
-			ImGui::CloseCurrentPopup();
 
+		std::function<void()> action;
+		if (proceed)
+		{
+			action = std::move(m_PendingAction);
+			m_PendingAction = nullptr;
+			ImGui::CloseCurrentPopup();
+		}
 		ImGui::EndPopup();
+
+		// Outside the popup, since the action may replace the scene this prompt names.
+		if (action)
+			action();
+	}
+
+	void CraftLayer::DrawShortcutsWindow()
+	{
+		if (!m_ShowShortcuts)
+			return;
+
+		static const char* shortcuts[][2] = {
+			{ "Ctrl+N", "New scene" },
+			{ "Ctrl+O", "Open scene" },
+			{ "Ctrl+S", "Save scene" },
+			{ "Ctrl+Shift+S", "Save scene as" },
+			{ "Ctrl+P", "Play / stop" },
+			{ "Q / W / E / R", "Select / move / rotate / scale tool" },
+			{ "Hold Ctrl", "Toggle snapping while dragging the gizmo" },
+			{ "Alt + left drag", "Orbit the camera" },
+			{ "Alt + middle drag", "Pan the camera" },
+			{ "Alt + right drag, wheel", "Zoom the camera" },
+			{ "F2, double-click", "Rename the selected entity" },
+			{ "Ctrl+D", "Duplicate the selected entity" },
+			{ "Del", "Delete the selected entity" },
+			{ "Up / Down", "Select the previous / next entity" },
+			{ "Backspace", "Content Browser: up one folder" },
+			{ "Ctrl + wheel", "Content Browser: thumbnail size" },
+			{ "F1", "Show or hide this list" },
+		};
+
+		ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+		ImGui::SetNextWindowSize(ImVec2(480.0f * ImGuiLayer::GetUIScale(), 0.0f), ImGuiCond_Appearing);
+		if (ImGui::Begin(RV_ICON_HELP "  Keyboard Shortcuts", &m_ShowShortcuts, ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings))
+		{
+			if (ImGui::BeginTable("##shortcuts", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+			{
+				for (const auto& shortcut : shortcuts)
+				{
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::PushFont(ImGuiLayer::GetFont(FontStyle::Bold));
+					ImGui::TextUnformatted(shortcut[0]);
+					ImGui::PopFont();
+					ImGui::TableSetColumnIndex(1);
+					ImGui::TextColored(Theme::TextMuted, "%s", shortcut[1]);
+				}
+				ImGui::EndTable();
+			}
+		}
+		ImGui::End();
 	}
 
 }

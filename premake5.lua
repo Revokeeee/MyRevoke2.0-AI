@@ -342,6 +342,7 @@ workspace "MyRevoke"
             "%{IncludeDir.OpenAL}",
             "%{IncludeDir.sndfile}",
             "%{IncludeDir.doctest}",
+            "%{IncludeDir.Box2D}",
         }
 
         links

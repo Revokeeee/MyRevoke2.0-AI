@@ -59,6 +59,7 @@ namespace Revoke
     Entity Scene::CreateEntity(const std::string name)
     {
         Entity entity = { m_Registry.create(), this };
+        m_EntityOrder.push_back(entity);
         entity.AddComponent<IdComponent>();
         entity.AddComponent<TransformComponent>();
         auto& entName = entity.AddComponent<NameComponent>();
@@ -70,12 +71,76 @@ namespace Revoke
     Entity Scene::CreateEntity(UUID id, const std::string name)
     {
         Entity entity = { m_Registry.create(), this };
+        m_EntityOrder.push_back(entity);
         entity.AddComponent<IdComponent>(id);
         entity.AddComponent<TransformComponent>();
         auto& entName = entity.AddComponent<NameComponent>();
 
         entName.Name = name.empty() ? "UnNamed Entity" : name;
         return entity;
+    }
+
+    template<typename T>
+    static void CopyComponentIfExists(Entity destination, Entity source)
+    {
+        if (!source.HasComponent<T>())
+            return;
+
+        // Copy out first: the destination's storage may grow while the component is added.
+        T component = source.GetComponent<T>();
+        if (destination.HasComponent<T>())
+            destination.GetComponent<T>() = component;
+        else
+            destination.AddComponent<T>(component);
+    }
+
+    Entity Scene::DuplicateEntity(Entity source)
+    {
+        Entity copy = CreateEntity(source.GetComponent<NameComponent>().Name);
+
+        CopyComponentIfExists<TransformComponent>(copy, source);
+        CopyComponentIfExists<SpriteRendererComponent>(copy, source);
+        CopyComponentIfExists<CameraComponent>(copy, source);
+        CopyComponentIfExists<RigidBodyComponent>(copy, source);
+        CopyComponentIfExists<BoxCollisionComponent>(copy, source);
+        CopyComponentIfExists<NativeScriptComponent>(copy, source);
+        CopyComponentIfExists<SoundComponent>(copy, source);
+
+        // Duplicating the main camera would leave two entities claiming the role.
+        if (copy.HasComponent<CameraComponent>())
+            copy.GetComponent<CameraComponent>().isMain = false;
+
+        // Runtime objects belong to the source; the copy gets its own or none.
+        if (copy.HasComponent<RigidBodyComponent>())
+            copy.GetComponent<RigidBodyComponent>().Body = nullptr;
+        if (copy.HasComponent<NativeScriptComponent>())
+            copy.GetComponent<NativeScriptComponent>().Instance = nullptr;
+        if (copy.HasComponent<SoundComponent>())
+        {
+            auto& sound = copy.GetComponent<SoundComponent>();
+            sound.BufferID = 0;
+            sound.SourceID = 0;
+            sound.SetPath(sound.AudioPath);
+        }
+
+        return copy;
+    }
+
+    std::vector<Entity> Scene::GetEntities()
+    {
+        std::vector<Entity> entities;
+        entities.reserve(m_EntityOrder.size());
+        for (entt::entity handle : m_EntityOrder)
+        {
+            if (m_Registry.valid(handle))
+                entities.emplace_back(handle, this);
+        }
+        return entities;
+    }
+
+    size_t Scene::GetEntityCount()
+    {
+        return m_EntityOrder.size();
     }
 
     Entity Scene::FindEntityByUUID(UUID id)
@@ -119,7 +184,9 @@ namespace Revoke
                 auto& boxColidor = entity.GetComponent<BoxCollisionComponent>();
 
                 b2PolygonShape shape;
-                shape.SetAsBox(transforms.Scale.x * boxColidor.Size.x, transforms.Scale.y * boxColidor.Size.y);
+                // The offset was never applied, so editing it in the Properties panel did nothing.
+                b2Vec2 offset(transforms.Scale.x * boxColidor.Offset.x, transforms.Scale.y * boxColidor.Offset.y);
+                shape.SetAsBox(transforms.Scale.x * boxColidor.Size.x, transforms.Scale.y * boxColidor.Size.y, offset, 0.0f);
 
                 b2FixtureDef fixture;
                 fixture.shape = &shape;
@@ -189,7 +256,11 @@ namespace Revoke
                 auto& rigitBody = entity.GetComponent<RigidBodyComponent>();
                 auto& transforms = entity.GetComponent<TransformComponent>();
 
+                // Bodies are created in OnRuntimeStart, so one added from the Properties panel
+                // while playing has none yet.
                 b2Body* body = rigitBody.Body;
+                if (!body)
+                    continue;
                 const auto& pos = body->GetPosition();
 
                 transforms.Position.x = pos.x;
@@ -302,7 +373,53 @@ namespace Revoke
     }
     void Scene::RemoveEntity(Entity ent)
     {
-       m_Registry.destroy(ent);
+        if (ent.HasComponent<SoundComponent>())
+            ent.GetComponent<SoundComponent>().ShutDown();
+        DestroyScriptInstance(ent);
+        DestroyPhysicsBody(ent);
+
+        m_EntityOrder.erase(std::remove(m_EntityOrder.begin(), m_EntityOrder.end(), (entt::entity)ent), m_EntityOrder.end());
+        m_Registry.destroy(ent);
+    }
+
+    void Scene::DestroyPhysicsBody(Entity entity)
+    {
+        // Removed while playing: take the body out of the world too, or it keeps colliding.
+        if (!entity.HasComponent<RigidBodyComponent>())
+            return;
+
+        auto& rigidBody = entity.GetComponent<RigidBodyComponent>();
+        if (m_B2World && rigidBody.Body)
+            m_B2World->DestroyBody(rigidBody.Body);
+        rigidBody.Body = nullptr;
+    }
+
+    void Scene::DestroyCollider(Entity entity)
+    {
+        if (!m_B2World || !entity.HasComponent<RigidBodyComponent>())
+            return;
+
+        b2Body* body = entity.GetComponent<RigidBodyComponent>().Body;
+        if (!body)
+            return;
+
+        // A body gets at most one fixture, from its BoxCollisionComponent.
+        while (b2Fixture* fixture = body->GetFixtureList())
+            body->DestroyFixture(fixture);
+    }
+
+    void Scene::DestroyScriptInstance(Entity entity)
+    {
+        if (!entity.HasComponent<NativeScriptComponent>())
+            return;
+
+        auto& nsc = entity.GetComponent<NativeScriptComponent>();
+        if (!nsc.Instance)
+            return;
+
+        nsc.Instance->OnDestroy();
+        delete nsc.Instance;
+        nsc.Instance = nullptr;
     }
 
     void Scene::OnSceneClose()
