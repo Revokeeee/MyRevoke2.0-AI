@@ -262,14 +262,9 @@ namespace Revoke
         out << YAML::BeginMap;
         out << YAML::Key << "Scene" << YAML::Value << m_Scene->GetName();
         out << YAML::Key << "Entities" << YAML::Value << YAML::BeginSeq;
-        m_Scene->m_Registry.each([&](auto entityID)
-            {
-                Entity entity = { entityID, m_Scene.get() };
-                if (!entity)
-                    return;
-
-                SerializeEntity(out, entity, m_AssetsDirectory);
-            });
+        // Oldest first, the order loading creates them in, so a save and reload keeps the order.
+        for (Entity entity : m_Scene->GetEntities())
+            SerializeEntity(out, entity, m_AssetsDirectory);
         out << YAML::EndSeq;
         out << YAML::EndMap;
 

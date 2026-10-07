@@ -30,6 +30,12 @@ namespace Revoke
 			
 			Entity CreateEntity(const std::string name = std::string());
 			Entity CreateEntity(UUID id, const std::string name = std::string());
+			// A new entity (with a new id) holding copies of the source's components.
+			Entity DuplicateEntity(Entity source);
+
+			// Every entity, oldest first. The registry itself iterates newest first, which made the
+			// hierarchy and the scene file flip order on every save and reload.
+			std::vector<Entity> GetEntities();
 
 			// Returns an empty Entity when no entity has this id.
 			Entity FindEntityByUUID(UUID id);
@@ -43,7 +49,10 @@ namespace Revoke
 
 			void OnViewportResize(uint32_t width, uint32_t height);
 
+			// Also frees what the entity's components hold outside the registry (sound, script instance).
 			void RemoveEntity(Entity ent);
+			// Calls OnDestroy on the entity's running script, if it has one, and frees it.
+			void DestroyScriptInstance(Entity entity);
 
 			void SetName(std::string name) { m_Name = name; }
 			std::string GetName() { return m_Name; }
