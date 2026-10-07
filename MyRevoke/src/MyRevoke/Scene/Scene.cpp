@@ -339,15 +339,7 @@ namespace Revoke
     }
     void Scene::OnRuntimeStop()
     {
-        m_Registry.view<NativeScriptComponent>().each([](auto entity, auto& nsc)
-            {
-                if (!nsc.Instance)
-                    return;
-
-                nsc.Instance->OnDestroy();
-                delete nsc.Instance;
-                nsc.Instance = nullptr;
-            });
+        DestroyAllScriptInstances();
 
         m_Registry.view<RigidBodyComponent>().each([](auto entity, auto& rigidBody)
             {
@@ -422,8 +414,25 @@ namespace Revoke
         nsc.Instance = nullptr;
     }
 
+    void Scene::DestroyAllScriptInstances()
+    {
+        m_Registry.view<NativeScriptComponent>().each([](auto entity, auto& nsc)
+            {
+                if (!nsc.Instance)
+                    return;
+
+                nsc.Instance->OnDestroy();
+                delete nsc.Instance;
+                nsc.Instance = nullptr;
+            });
+    }
+
     void Scene::OnSceneClose()
     {
+        // A scene can be dropped without ever being stopped, and the script DLL is still
+        // loaded here, so this is the last point where OnDestroy can run.
+        DestroyAllScriptInstances();
+
         { // Sounds
 
             auto view = m_Registry.view<SoundComponent>();

@@ -99,3 +99,38 @@ TEST_CASE("DestroyPhysicsBody outside play mode does nothing")
 	scene->DestroyCollider(entity);
 	CHECK(entity.GetComponent<RigidBodyComponent>().Body == nullptr);
 }
+
+TEST_CASE("Stopping play destroys every running script")
+{
+	auto scene = std::make_shared<Scene>("test");
+	Entity first = scene->CreateEntity("First");
+	Entity second = scene->CreateEntity("Second");
+
+	bool firstDestroyed = false;
+	bool secondDestroyed = false;
+	first.AddComponent<NativeScriptComponent>().Instance = new TrackingScript(firstDestroyed);
+	second.AddComponent<NativeScriptComponent>().Instance = new TrackingScript(secondDestroyed);
+
+	scene->OnRuntimeStart();
+	scene->OnRuntimeStop();
+
+	CHECK(firstDestroyed);
+	CHECK(secondDestroyed);
+	// Cleared, so the next Play builds a new instance and runs OnCreate again.
+	CHECK(first.GetComponent<NativeScriptComponent>().Instance == nullptr);
+	CHECK(second.GetComponent<NativeScriptComponent>().Instance == nullptr);
+}
+
+TEST_CASE("Closing a scene destroys its running scripts")
+{
+	auto scene = std::make_shared<Scene>("test");
+	Entity entity = scene->CreateEntity("Scripted");
+
+	bool destroyed = false;
+	entity.AddComponent<NativeScriptComponent>().Instance = new TrackingScript(destroyed);
+
+	scene->OnSceneClose();
+
+	CHECK(destroyed);
+	CHECK(entity.GetComponent<NativeScriptComponent>().Instance == nullptr);
+}

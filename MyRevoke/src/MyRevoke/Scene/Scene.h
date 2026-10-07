@@ -68,6 +68,8 @@ namespace Revoke
 			int GetGravityPositionIteration() const { return m_PositionIteration; }
 			int GetGravityVelocityIteration() const { return m_VelocityIteration; }
 
+			// Releases what the scene holds outside the registry (sounds, script instances). Call
+			// before dropping a scene, while the script DLL is still loaded.
 			void OnSceneClose();
 
 			Entity GetMainCamera() ;
@@ -75,6 +77,9 @@ namespace Revoke
 	private:
 		template<typename T>
 		void OnComponentAdded(Entity entity, T& component);
+
+		// Every running script in the scene, destroyed the same way as a single one.
+		void DestroyAllScriptInstances();
 	private:
 		entt::registry m_Registry;
 		// Live entities in creation order. The registry's own storage can't be used for this:
