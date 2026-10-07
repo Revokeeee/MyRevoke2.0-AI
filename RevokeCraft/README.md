@@ -18,10 +18,10 @@ single `CraftLayer`, and implements the `Revoke::CreateApplication()` factory re
 | `ObjectsPannel.h`/`.cpp` *(sic — "Panel")* | "Scene Hierarchy" + "Properties" | Iterates `Scene`'s registry, per-component property editors, "Add Component" popup |
 | `ContentBrowser.h`/`.cpp` | "Content Browser" | Icon grid over the open project's assets tree; drag-and-drop source for textures/audio/scripts |
 | `SceneSettingsPannel.h`/`.cpp` *(sic)* | "Scene Settings" | Clear color, blending toggle, physics iteration counts, "Build Scripts" (`msbuild` on `MyRevoke-NativeScriptCore`; not in `Dist` builds) |
-| `ToolBar.h`/`.cpp` | Play/Stop + gizmo mode (Q/W/E/R) toolbar | `Scene::OnRuntimeStart`/`OnRuntimeStop`, writes into a shared gizmo-type pointer |
+| `ToolBar.h`/`.cpp` | Gizmo tools (Q/W/E/R), local/world and snap toggles, Play/Stop (Ctrl+P) | Owns the gizmo state `CraftLayer` reads; calls back into `CraftLayer` to start/stop play mode |
 
 `CraftLayer` owns all four panels as plain members (composition, not polymorphism); `OnAttach()` wires
-shared state (the `Scene`, the gizmo pointer) into them, and `OnImGuiDraw()` calls each panel's
+shared state (the `Scene`, the play callbacks) into them, and `OnImGuiDraw()` calls each panel's
 `OnImGuiRender()` in sequence. Whenever the scene changes (new/open), `CraftLayer` manually re-pushes
 the new `Scene` into every panel — there's no observer/event pattern for this.
 
@@ -37,7 +37,7 @@ The editor's own files live next to `RevokeCraft.exe` (the Premake `targetdir` f
 started from any working directory.
 
 - `resourses/` *(sic — "resources")*: `shaders/Main.shader` (the engine's renderer shader), `icons/`
-  for the content browser and toolbar, and `scripts/Native` where the compiled
+  for the content browser, and `scripts/Native` where the compiled
   `MyRevoke-NativeScriptCore` DLL is hot-loaded from at runtime.
 - `mono/` — the Mono runtime distribution needed for embedded C# scripting.
 - `projects/Example/` — the example project (the old `assets/` content), opened on startup.
