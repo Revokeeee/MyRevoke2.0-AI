@@ -8,6 +8,8 @@
 #include "MyRevoke/Scene/Entity.h"
 #include "MyRevoke/Scripting/ScriptEntity.h"
 
+#include <box2d/b2_body.h>
+
 using namespace Revoke;
 
 // Removing an entity, or a component from the Properties panel, has to release what the
@@ -64,4 +66,36 @@ TEST_CASE("A sound component without a file owns no audio objects")
 	sound.ShutDown();
 	CHECK(sound.BufferID == 0);
 	CHECK(sound.SourceID == 0);
+}
+
+TEST_CASE("Removing a body or collider while playing takes it out of the physics world")
+{
+	auto scene = std::make_shared<Scene>("test");
+	Entity entity = scene->CreateEntity("Crate");
+	entity.AddComponent<RigidBodyComponent>().Type = RigidBodyComponent::BodyType::DynamicBody;
+	entity.AddComponent<BoxCollisionComponent>();
+
+	scene->OnRuntimeStart();
+	b2Body* body = entity.GetComponent<RigidBodyComponent>().Body;
+	REQUIRE(body != nullptr);
+	CHECK(body->GetFixtureList() != nullptr);
+
+	scene->DestroyCollider(entity);
+	CHECK(body->GetFixtureList() == nullptr);
+
+	scene->DestroyPhysicsBody(entity);
+	CHECK(entity.GetComponent<RigidBodyComponent>().Body == nullptr);
+
+	scene->OnRuntimeStop();
+}
+
+TEST_CASE("DestroyPhysicsBody outside play mode does nothing")
+{
+	auto scene = std::make_shared<Scene>("test");
+	Entity entity = scene->CreateEntity("Crate");
+	entity.AddComponent<RigidBodyComponent>();
+
+	scene->DestroyPhysicsBody(entity);
+	scene->DestroyCollider(entity);
+	CHECK(entity.GetComponent<RigidBodyComponent>().Body == nullptr);
 }

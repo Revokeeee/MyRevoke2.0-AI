@@ -21,8 +21,12 @@ single `CraftLayer`, and implements the `Revoke::CreateApplication()` factory re
 | `ContentBrowser.h`/`.cpp` | "Content Browser" | Grid of the open project's assets with breadcrumbs, recursive search, image thumbnails and typed icons; double-click opens folders and scenes; drag-and-drop source for the viewport and Properties fields |
 | `SceneSettingsPannel.h`/`.cpp` *(sic)* | "Scene Settings" | Scene name, background color, alpha blending, Box2D iteration counts (read from the scene), "Build Scripts" (`msbuild` on `MyRevoke-NativeScriptCore`; not in `Dist` builds) |
 | `ToolBar.h`/`.cpp` | Gizmo tools (Q/W/E/R), local/world and snap toggles, Play/Stop (Ctrl+P) | Owns the gizmo state `CraftLayer` reads; calls back into `CraftLayer` to start/stop play mode |
+| `ConsolePanel.h`/`.cpp` | "Console" | Engine and editor log messages from `Log::GetHistory()`, with level filters, text filter, clear and auto-scroll |
 
-`CraftLayer` owns all four panels as plain members (composition, not polymorphism); `OnAttach()` wires
+`CraftLayer` also draws a status bar (mode, scene and unsaved state, latest log message, render stats)
+and keeps the window title in step with the open scene.
+
+`CraftLayer` owns the panels as plain members (composition, not polymorphism); `OnAttach()` wires
 shared state (the `Scene`, the play callbacks) into them, and `OnImGuiDraw()` calls each panel's
 `OnImGuiRender()` in sequence. Whenever the scene changes (new/open), `CraftLayer` manually re-pushes
 the new `Scene` into every panel — there's no observer/event pattern for this.

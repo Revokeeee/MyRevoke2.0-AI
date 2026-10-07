@@ -34,6 +34,24 @@ TEST_CASE("GetEntities lists entities in the order they were created")
 	CHECK(NamesOf(*scene) == std::vector<std::string>{ "First", "Second", "Third" });
 }
 
+TEST_CASE("Deleting an entity keeps the others in creation order")
+{
+	// The registry fills a destroyed entity's slot with its last entity, so the order can't
+	// come from the registry's storage.
+	auto scene = std::make_shared<Scene>("test");
+	scene->CreateEntity("A");
+	Entity b = scene->CreateEntity("B");
+	scene->CreateEntity("C");
+	scene->CreateEntity("D");
+
+	scene->RemoveEntity(b);
+	CHECK(NamesOf(*scene) == std::vector<std::string>{ "A", "C", "D" });
+	CHECK(scene->GetEntityCount() == 3);
+
+	scene->CreateEntity("E");
+	CHECK(NamesOf(*scene) == std::vector<std::string>{ "A", "C", "D", "E" });
+}
+
 TEST_CASE("Saving and loading a scene keeps its entity order")
 {
 	auto scene = std::make_shared<Scene>("test");

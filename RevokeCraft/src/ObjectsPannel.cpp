@@ -43,6 +43,19 @@ namespace Revoke
 			scene.DestroyScriptInstance(entity);
 		}
 
+		// While playing, the physics world still holds the body and its fixture.
+		template<>
+		void ReleaseComponent<RigidBodyComponent>(Scene& scene, Entity entity)
+		{
+			scene.DestroyPhysicsBody(entity);
+		}
+
+		template<>
+		void ReleaseComponent<BoxCollisionComponent>(Scene& scene, Entity entity)
+		{
+			scene.DestroyCollider(entity);
+		}
+
 		// One collapsible section per component: a bold header with a settings menu, then the
 		// component's fields in a label | value table.
 		template<typename T, typename DrawFunction>

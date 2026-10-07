@@ -59,6 +59,7 @@ namespace Revoke
     Entity Scene::CreateEntity(const std::string name)
     {
         Entity entity = { m_Registry.create(), this };
+        m_EntityOrder.push_back(entity);
         entity.AddComponent<IdComponent>();
         entity.AddComponent<TransformComponent>();
         auto& entName = entity.AddComponent<NameComponent>();
@@ -70,6 +71,7 @@ namespace Revoke
     Entity Scene::CreateEntity(UUID id, const std::string name)
     {
         Entity entity = { m_Registry.create(), this };
+        m_EntityOrder.push_back(entity);
         entity.AddComponent<IdComponent>(id);
         entity.AddComponent<TransformComponent>();
         auto& entName = entity.AddComponent<NameComponent>();
@@ -126,21 +128,19 @@ namespace Revoke
 
     std::vector<Entity> Scene::GetEntities()
     {
-        // Every entity gets an IdComponent when it is created, so its storage holds them in
-        // creation order; views walk it backwards.
         std::vector<Entity> entities;
-        auto view = m_Registry.view<IdComponent>();
-        entities.reserve(view.size());
-        for (auto handle : view)
-            entities.emplace_back(handle, this);
-
-        std::reverse(entities.begin(), entities.end());
+        entities.reserve(m_EntityOrder.size());
+        for (entt::entity handle : m_EntityOrder)
+        {
+            if (m_Registry.valid(handle))
+                entities.emplace_back(handle, this);
+        }
         return entities;
     }
 
     size_t Scene::GetEntityCount()
     {
-        return m_Registry.view<IdComponent>().size();
+        return m_EntityOrder.size();
     }
 
     Entity Scene::FindEntityByUUID(UUID id)
@@ -376,17 +376,36 @@ namespace Revoke
         if (ent.HasComponent<SoundComponent>())
             ent.GetComponent<SoundComponent>().ShutDown();
         DestroyScriptInstance(ent);
+        DestroyPhysicsBody(ent);
 
-        // Deleted while playing: take the body out of the world too, or it keeps colliding.
-        if (m_B2World && ent.HasComponent<RigidBodyComponent>())
-        {
-            auto& rigidBody = ent.GetComponent<RigidBodyComponent>();
-            if (rigidBody.Body)
-                m_B2World->DestroyBody(rigidBody.Body);
-            rigidBody.Body = nullptr;
-        }
-
+        m_EntityOrder.erase(std::remove(m_EntityOrder.begin(), m_EntityOrder.end(), (entt::entity)ent), m_EntityOrder.end());
         m_Registry.destroy(ent);
+    }
+
+    void Scene::DestroyPhysicsBody(Entity entity)
+    {
+        // Removed while playing: take the body out of the world too, or it keeps colliding.
+        if (!entity.HasComponent<RigidBodyComponent>())
+            return;
+
+        auto& rigidBody = entity.GetComponent<RigidBodyComponent>();
+        if (m_B2World && rigidBody.Body)
+            m_B2World->DestroyBody(rigidBody.Body);
+        rigidBody.Body = nullptr;
+    }
+
+    void Scene::DestroyCollider(Entity entity)
+    {
+        if (!m_B2World || !entity.HasComponent<RigidBodyComponent>())
+            return;
+
+        b2Body* body = entity.GetComponent<RigidBodyComponent>().Body;
+        if (!body)
+            return;
+
+        // A body gets at most one fixture, from its BoxCollisionComponent.
+        while (b2Fixture* fixture = body->GetFixtureList())
+            body->DestroyFixture(fixture);
     }
 
     void Scene::DestroyScriptInstance(Entity entity)
