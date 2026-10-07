@@ -416,14 +416,9 @@ namespace Revoke
 
     void Scene::DestroyAllScriptInstances()
     {
-        m_Registry.view<NativeScriptComponent>().each([](auto entity, auto& nsc)
+        m_Registry.view<NativeScriptComponent>().each([this](auto entity, auto&)
             {
-                if (!nsc.Instance)
-                    return;
-
-                nsc.Instance->OnDestroy();
-                delete nsc.Instance;
-                nsc.Instance = nullptr;
+                DestroyScriptInstance(Entity{ entity, this });
             });
     }
 
