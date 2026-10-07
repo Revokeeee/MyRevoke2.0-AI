@@ -40,6 +40,9 @@ namespace Revoke {
 		void SetVSync(bool enable);
 		bool IsVSync() const;
 
+		void SetTitle(const std::string& title);
+		const std::string& GetTitle() const { return m_Data.Title; }
+
 		void* GetCoreWindow() const { return m_Window; }
 	private:
 		void Init(const WindowSettings& settings);

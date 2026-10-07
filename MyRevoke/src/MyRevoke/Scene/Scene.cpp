@@ -138,6 +138,11 @@ namespace Revoke
         return entities;
     }
 
+    size_t Scene::GetEntityCount()
+    {
+        return m_Registry.view<IdComponent>().size();
+    }
+
     Entity Scene::FindEntityByUUID(UUID id)
     {
         auto view = m_Registry.view<IdComponent>();
