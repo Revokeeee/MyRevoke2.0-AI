@@ -1,5 +1,6 @@
 #include "CraftLayer.h"
 #include "EditorUI.h"
+#include "GameExport.h"
 
 #include <chrono>
 #include <fstream>
@@ -240,6 +241,8 @@ namespace Revoke
 				ImGui::Separator();
 				if (ImGui::MenuItem(RV_ICON_FOLDER_ADD "  New Project...")) NewProject();
 				if (ImGui::MenuItem(RV_ICON_LIBRARY "  Open Project...")) OpenProject();
+				ImGui::Separator();
+				if (ImGui::MenuItem(RV_ICON_BUILD "  Build Game...", nullptr, false, (bool)m_Project)) BuildGame();
 				ImGui::Separator();
 				if (ImGui::MenuItem(RV_ICON_POWER "  Exit", "Alt+F4")) Application::Get().RequestClose();
 
@@ -507,6 +510,20 @@ namespace Revoke
 		{
 			SetProject(project);
 		}
+	}
+
+	void CraftLayer::BuildGame()
+	{
+		// The game is built from the files on disk, so unsaved scene changes would not be in it.
+		RunAfterSavePrompt([this]()
+		{
+			if (!m_Project)
+				return;
+
+			std::string folder = FileExplorer::SelectFolder("Choose a folder for the built game");
+			if (!folder.empty())
+				ExportGame(*m_Project, folder);
+		});
 	}
 
 	std::filesystem::path CraftLayer::GetAssetsDirectory() const

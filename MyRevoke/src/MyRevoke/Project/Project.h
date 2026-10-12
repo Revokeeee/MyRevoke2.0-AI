@@ -17,6 +17,7 @@ namespace Revoke
 
 		const std::string& GetName() const { return m_Name; }
 		const std::filesystem::path& GetDirectory() const { return m_Directory; }
+		std::filesystem::path GetFilePath() const { return m_Directory / (m_Name + ".mrproject"); }
 
 		std::filesystem::path GetAssetsDirectory() const { return m_Directory / m_AssetsFolder; }
 		std::filesystem::path GetScenesDirectory() const { return GetAssetsDirectory() / "Scenes"; }

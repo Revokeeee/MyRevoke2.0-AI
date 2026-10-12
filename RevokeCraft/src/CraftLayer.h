@@ -39,6 +39,8 @@ namespace Revoke
 		void NewProject();
 		void OpenProject();
 		void OpenProject(const std::filesystem::path& projectFilePath);
+		// Asks for an output folder and writes a runnable game into it. Needs an open project.
+		void BuildGame();
 
 		void NewScene();
 		void OpenScene();

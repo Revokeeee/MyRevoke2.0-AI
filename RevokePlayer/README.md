@@ -1,7 +1,8 @@
 # RevokePlayer
 
 The standalone game runtime: the same scene playback the editor's Play mode runs, in an app with no
-editor UI. Game export will ship a renamed copy of this exe next to the user's project.
+editor UI. The editor's File > Build Game ships a renamed copy of this exe next to the user's project
+(`RevokeCraft/src/GameExport.cpp`).
 
 ## Entry point
 
