@@ -48,13 +48,22 @@ started from any working directory.
 - `mono/` — the Mono runtime distribution needed for embedded C# scripting.
 - `projects/Example/` — the example project (the old `assets/` content), opened on startup.
 
+## Building a game
+
+File > Build Game asks for an output folder and `src/GameExport.cpp` writes a runnable game into it:
+`RevokePlayer.exe` from next to the editor, renamed to the project's game name, plus `OpenAL32.dll`,
+`resourses/`, the project file and the whole assets folder. Build leftovers (`.lib`, `.exp`, `.pdb`,
+`.ilk`, `imgui.ini` and the patched script DLL copies) are skipped, and `mono/lib` is left out
+because C# scripting doesn't run yet (#36). Building again into the same folder overwrites it.
+
 ## Shipping the editor
 
-`scripts/stage-editor.ps1` builds this project in `Dist` and assembles `dist/MyRevoke/`: the exe,
-`OpenAL32.dll`, `mono/lib`, `resourses/` and `projects/Example/`, with import libraries, debug info
-and build intermediates left out. The folder runs on a machine with no Visual Studio and no repo
-checkout, but it carries no MSVC runtime (`staticruntime "off"`), so that machine needs the
-**Microsoft Visual C++ 2015-2022 Redistributable (x64)**.
+`scripts/stage-editor.ps1` builds this project and `RevokePlayer` in `Dist` and assembles
+`dist/MyRevoke/`: both exes, `OpenAL32.dll`, `mono/lib`, `resourses/` and `projects/Example/`, with
+import libraries, debug info and build intermediates left out. `RevokePlayer.exe` is in there so Build
+Game has something to copy. The folder runs on a machine with no Visual Studio and no repo checkout,
+but it carries no MSVC runtime (`staticruntime "off"`), so that machine needs the **Microsoft Visual
+C++ 2015-2022 Redistributable (x64)**.
 
 ## Known issues
 

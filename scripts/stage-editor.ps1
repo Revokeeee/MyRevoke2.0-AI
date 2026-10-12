@@ -1,8 +1,9 @@
 #Requires -Version 5.1
 <#
-    Builds RevokeCraft in the Dist configuration and assembles dist/MyRevoke - a
-    folder that runs the editor on a machine with no Visual Studio and no repo
-    checkout.
+    Builds RevokeCraft and RevokePlayer in the Dist configuration and assembles
+    dist/MyRevoke - a folder that runs the editor on a machine with no Visual
+    Studio and no repo checkout. RevokePlayer.exe goes in next to the editor
+    because File > Build Game copies it into the folder it exports.
 
     Target machines still need the Microsoft Visual C++ 2015-2022 Redistributable
     (x64): premake5.lua keeps staticruntime "off", so the MSVC runtime is not
@@ -46,10 +47,10 @@ function Invoke-DistBuild
         throw 'MSBuild not found. Install Visual Studio or the Visual Studio Build Tools.'
     }
 
-    & $msbuild (Join-Path $repoRoot 'MyRevoke.sln') -m -nologo '-t:RevokeCraft' '-p:Configuration=Dist' '-p:Platform=x64'
+    & $msbuild (Join-Path $repoRoot 'MyRevoke.sln') -m -nologo '-t:RevokeCraft;RevokePlayer' '-p:Configuration=Dist' '-p:Platform=x64'
     if ($LASTEXITCODE -ne 0)
     {
-        throw 'Dist build of RevokeCraft failed.'
+        throw 'Dist build of RevokeCraft and RevokePlayer failed.'
     }
 }
 
@@ -83,10 +84,14 @@ if (-not $SkipBuild)
     Invoke-DistBuild
 }
 
-$exe = Join-Path $editorDir 'RevokeCraft.exe'
-if (-not (Test-Path $exe))
+$editorExe = Join-Path $editorDir 'RevokeCraft.exe'
+$playerExe = Join-Path $editorDir 'RevokePlayer.exe'
+foreach ($exe in @($editorExe, $playerExe))
 {
-    throw "RevokeCraft.exe not found at $exe."
+    if (-not (Test-Path $exe))
+    {
+        throw "$(Split-Path -Leaf $exe) not found at $exe."
+    }
 }
 
 if (Test-Path $OutputPath)
@@ -97,7 +102,8 @@ New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
 
 # The editor opens its resources relative to its own exe (GetExecutableDirectory),
 # so the staged layout has to match the folder RevokeCraft builds into.
-Copy-Item $exe -Destination $OutputPath
+Copy-Item $editorExe -Destination $OutputPath
+Copy-Item $playerExe -Destination $OutputPath
 Copy-Item (Join-Path $editorDir 'OpenAL32.dll') -Destination $OutputPath
 Copy-Item (Join-Path $editorDir 'resourses') -Destination $OutputPath -Recurse
 Copy-Item (Join-Path $editorDir 'projects') -Destination $OutputPath -Recurse

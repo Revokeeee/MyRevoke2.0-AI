@@ -12,7 +12,8 @@ to it.
   isn't a project. `GetAssetsDirectory()`/`GetScenesDirectory()`/`GetScriptsDirectory()` are what the
   editor's content browser, scene save/load and drag-and-drop use instead of a path next to the exe.
   `GetStartupScenePath()` is the scene [`RevokePlayer`](../../../../RevokePlayer/README.md) starts a
-  game in, empty when the project file names none.
+  game in, empty when the project file names none. `GetFilePath()` is the project file itself, which
+  `Save()` writes and game export copies.
 
 The project file is YAML, like the `.myrevoke` scene files:
 

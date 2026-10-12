@@ -80,7 +80,7 @@ namespace Revoke
 		out << YAML::Key << "Fullscreen" << YAML::Value << m_Fullscreen;
 		out << YAML::EndMap;
 
-		std::ofstream file(m_Directory / (m_Name + ".mrproject"));
+		std::ofstream file(GetFilePath());
 		file << out.c_str();
 	}
 }
