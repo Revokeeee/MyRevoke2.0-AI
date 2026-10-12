@@ -22,11 +22,16 @@ namespace Revoke
 		std::filesystem::path GetScenesDirectory() const { return GetAssetsDirectory() / "Scenes"; }
 		std::filesystem::path GetScriptsDirectory() const { return GetAssetsDirectory() / "Scripts"; }
 
+		// The scene a game built from this project starts in. Empty when the project file names none.
+		std::filesystem::path GetStartupScenePath() const;
+
 	private:
 		void Save() const;
 
 		std::string m_Name;
 		std::string m_AssetsFolder = "assets";
+		// Relative to the assets folder, so the project stays valid when it is moved.
+		std::string m_StartupScene;
 		std::filesystem::path m_Directory;
 	};
 }

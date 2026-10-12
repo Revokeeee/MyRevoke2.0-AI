@@ -351,6 +351,13 @@ OpenCover/
 /RevokeCraft/RevokeCraft.lib
 /RevokeCraft/RevokeCraft.ilk
 
+# RevokePlayer builds into the editor's folder: it loads resourses/ and the project it runs next to
+# its own exe, and the editor copies it when exporting a game
+/RevokeCraft/RevokePlayer.exe
+/RevokeCraft/RevokePlayer.exp
+/RevokeCraft/RevokePlayer.lib
+/RevokeCraft/RevokePlayer.ilk
+
 # scripts/stage-editor.ps1 assembles the shippable editor folder here
 /dist/
 
