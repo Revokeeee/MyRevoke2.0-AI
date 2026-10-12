@@ -104,6 +104,12 @@ namespace Revoke
 
 	bool ExportGame(const Project& project, const std::filesystem::path& outputDirectory)
 	{
+		// RevokePlayer.exe is only a windowed, Release-CRT app in a Dist build (premake5.lua); in
+		// Debug/Release it is a console app that can need a CRT the target machine does not have.
+#ifndef RV_DIST
+		RV_EDITOR_ERROR("Build Game: run the editor as a Dist build first, so the exported RevokePlayer.exe is a standalone windowed app");
+		return false;
+#else
 		const std::filesystem::path& editorDirectory = GetExecutableDirectory();
 
 		std::error_code error;
@@ -150,5 +156,6 @@ namespace Revoke
 
 		RV_EDITOR_INFO("Build Game: built {0} in {1}", exeName, output.string());
 		return true;
+#endif
 	}
 }

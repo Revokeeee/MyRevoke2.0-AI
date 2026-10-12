@@ -55,6 +55,8 @@ File > Build Game asks for an output folder and `src/GameExport.cpp` writes a ru
 `resourses/`, the project file and the whole assets folder. Build leftovers (`.lib`, `.exp`, `.pdb`,
 `.ilk`, `imgui.ini` and the patched script DLL copies) are skipped, and `mono/lib` is left out
 because C# scripting doesn't run yet (#36). Building again into the same folder overwrites it.
+`ExportGame` refuses to run unless the editor itself is a `Dist` build, since the `RevokePlayer.exe`
+next to a Debug/Release editor is a console app that can need a CRT the target machine doesn't have.
 
 ## Shipping the editor
 
