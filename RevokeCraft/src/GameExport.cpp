@@ -64,23 +64,33 @@ namespace Revoke
 		}
 
 		std::error_code walkError;
-		for (const auto& entry : std::filesystem::recursive_directory_iterator(from, walkError))
+		try
 		{
-			if (entry.is_directory() || IsBuildLeftover(entry.path()))
-				continue;
-
-			std::filesystem::path destination = to / entry.path().lexically_relative(from);
-
-			std::error_code error;
-			std::filesystem::create_directories(destination.parent_path(), error);
-			if (error)
+			for (const auto& entry : std::filesystem::recursive_directory_iterator(from, walkError))
 			{
-				RV_EDITOR_ERROR("Build Game: could not create {0}: {1}", destination.parent_path().string(), error.message());
-				return false;
-			}
+				if (entry.is_directory() || IsBuildLeftover(entry.path()))
+					continue;
 
-			if (!CopyInto(entry.path(), destination))
-				return false;
+				std::filesystem::path destination = to / entry.path().lexically_relative(from);
+
+				std::error_code error;
+				std::filesystem::create_directories(destination.parent_path(), error);
+				if (error)
+				{
+					RV_EDITOR_ERROR("Build Game: could not create {0}: {1}", destination.parent_path().string(), error.message());
+					return false;
+				}
+
+				if (!CopyInto(entry.path(), destination))
+					return false;
+			}
+		}
+		// The error_code passed to recursive_directory_iterator only covers opening "from" itself;
+		// a later error entering a subdirectory (permission denied, a broken symlink) throws instead.
+		catch (const std::filesystem::filesystem_error& exception)
+		{
+			RV_EDITOR_ERROR("Build Game: could not read {0}: {1}", from.string(), exception.what());
+			return false;
 		}
 
 		if (walkError)
