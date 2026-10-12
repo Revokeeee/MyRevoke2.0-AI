@@ -253,6 +253,74 @@ workspace "MyRevoke"
 
    
 
+    project "RevokePlayer"
+        location "RevokePlayer"
+        kind "ConsoleApp"
+        cppdialect "C++20"
+        language "C++"
+        staticruntime "off"
+
+        -- The player loads resourses/ and the project it runs from next to its own exe, the same
+        -- folders the editor builds into. Building here keeps it runnable in a checkout, and the
+        -- editor needs a RevokePlayer.exe beside it to copy when exporting a game.
+        targetdir ("RevokeCraft")
+        objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
+
+        files
+        {
+            "%{prj.name}/src/**.h",
+            "%{prj.name}/src/**.cpp",
+        }
+
+        includedirs
+        {
+            "MyRevoke/vendor/spdlog/include",
+            "MyRevoke/src",
+            "%{IncludeDir.GLM}",
+            "%{IncludeDir.ImGui}",
+            "%{IncludeDir.ENTT}",
+            "%{IncludeDir.ImGuizmo}",
+            "%{IncludeDir.OpenAL}",
+            "%{IncludeDir.sndfile}",
+        }
+
+        links
+        {
+            "MyRevoke",
+        }
+
+        filter "system:windows"
+
+            systemversion "latest"
+
+            defines
+            {
+                "RV_PLATFORM_WINDOWS",
+                "_CRT_SECURE_NO_WARNINGS"
+            }
+
+        filter "configurations:Debug"
+            defines "RV_DEBUG"
+            runtime "Debug"
+            symbols "On"
+
+        filter "configurations:Release"
+            defines "RV_RELEASE"
+            runtime "Release"
+            optimize "On"
+
+        filter "configurations:Dist"
+            defines "RV_DIST"
+            runtime "Release"
+            optimize "On"
+            symbols "Off"
+
+            -- A shipped game shows no console. main() stays the entry point, so the linker has
+            -- to be pointed at it instead of WinMain.
+            kind "WindowedApp"
+            entrypoint "mainCRTStartup"
+
+
     project "SandBox"
         location "SandBox"
         kind "ConsoleApp"

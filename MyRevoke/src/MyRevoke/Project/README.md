@@ -11,12 +11,15 @@ to it.
   project file; `Load(projectFilePath)` reads one back and returns `nullptr` if the file is missing or
   isn't a project. `GetAssetsDirectory()`/`GetScenesDirectory()`/`GetScriptsDirectory()` are what the
   editor's content browser, scene save/load and drag-and-drop use instead of a path next to the exe.
+  `GetStartupScenePath()` is the scene [`RevokePlayer`](../../../../RevokePlayer/README.md) starts a
+  game in, empty when the project file names none.
 
 The project file is YAML, like the `.myrevoke` scene files:
 
 ```yaml
 Project: Example
 AssetsFolder: assets
+StartupScene: Scenes/Geometry Dash.myrevoke
 ```
 
 `RevokeCraft` owns the open `Project` (`CraftLayer::m_Project`) and pushes its assets directory into

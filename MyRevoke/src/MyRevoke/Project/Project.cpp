@@ -43,8 +43,18 @@ namespace Revoke
 		project->m_Directory = projectFilePath.parent_path();
 		if (data["AssetsFolder"])
 			project->m_AssetsFolder = data["AssetsFolder"].as<std::string>();
+		if (data["StartupScene"])
+			project->m_StartupScene = data["StartupScene"].as<std::string>();
 
 		return project;
+	}
+
+	std::filesystem::path Project::GetStartupScenePath() const
+	{
+		if (m_StartupScene.empty())
+			return {};
+
+		return GetAssetsDirectory() / m_StartupScene;
 	}
 
 	void Project::Save() const
@@ -53,6 +63,7 @@ namespace Revoke
 		out << YAML::BeginMap;
 		out << YAML::Key << "Project" << YAML::Value << m_Name;
 		out << YAML::Key << "AssetsFolder" << YAML::Value << m_AssetsFolder;
+		out << YAML::Key << "StartupScene" << YAML::Value << m_StartupScene;
 		out << YAML::EndMap;
 
 		std::ofstream file(m_Directory / (m_Name + ".mrproject"));
