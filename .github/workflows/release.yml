@@ -1,0 +1,97 @@
+name: Release
+
+# Builds the Windows installer and publishes it as a GitHub Release (#39).
+# Runs only when started by hand from the Actions tab ("Run workflow"), and only
+# for the repository owner; nothing pushes a release automatically.
+#
+# Steps: stage the editor (scripts/stage-editor.ps1 builds Dist), compile
+# installer/MyRevoke.iss with Inno Setup, then create the release for the tag
+# and attach dist/MyRevoke-Setup-<version>.exe. The version comes from VERSION.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (empty: v + the VERSION file, e.g. v0.1.0)"
+        required: false
+        default: ""
+      prerelease:
+        description: "Mark as a pre-release"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # workflow_dispatch can be started by anyone with write access; keep it to the owner.
+    if: github.actor == github.repository_owner
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout (with submodules)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          submodules: recursive
+
+      - name: Read version and tag
+        id: version
+        shell: pwsh
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          if (-not $version) { throw "VERSION is empty" }
+          $tag = "${{ inputs.tag }}".Trim()
+          if (-not $tag) { $tag = "v$version" }
+          if ($tag -ne "v$version") { throw "Tag $tag does not match VERSION ($version). Update VERSION or leave the tag empty." }
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+
+      - name: Fail if the release already exists
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${{ steps.version.outputs.tag }}" *> $null
+          if ($LASTEXITCODE -eq 0) { throw "Release ${{ steps.version.outputs.tag }} already exists." }
+          $global:LASTEXITCODE = 0
+
+      - name: Stage the editor (builds Dist)
+        shell: pwsh
+        run: ./scripts/stage-editor.ps1
+
+      # The runner image usually ships Inno Setup 6; install it only when it's missing.
+      - name: Find or install Inno Setup
+        id: inno
+        shell: pwsh
+        run: |
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup --no-progress -y
+            if ($LASTEXITCODE -ne 0) { throw "Installing Inno Setup failed" }
+          }
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc" }
+          "iscc=$iscc" >> $env:GITHUB_OUTPUT
+
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          & "${{ steps.inno.outputs.iscc }}" installer\MyRevoke.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
+          $setup = "dist\MyRevoke-Setup-${{ steps.version.outputs.version }}.exe"
+          if (-not (Test-Path $setup)) { throw "$setup was not produced" }
+
+      - name: Create the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $flags = @('--target', '${{ github.sha }}', '--title', 'MyRevoke ${{ steps.version.outputs.version }}', '--generate-notes')
+          if ('${{ inputs.prerelease }}' -eq 'true') { $flags += '--prerelease' }
+          gh release create '${{ steps.version.outputs.tag }}' "dist\MyRevoke-Setup-${{ steps.version.outputs.version }}.exe" @flags
+          if ($LASTEXITCODE -ne 0) { throw "gh release create failed" }
