@@ -11,6 +11,7 @@
 #include "ContentBrowser.h"
 #include "ToolBar.h"
 #include "SceneSettingsPannel.h"
+#include "ProjectSettingsPanel.h"
 #include "ConsolePanel.h"
 
 #include "MyRevoke/Project/Project.h"
@@ -109,7 +110,8 @@ namespace Revoke
 		ObjectsPannel m_ObjPannel;
 		ContentBrowser m_ContentBrowserPanel;
 		ToolBar m_ToolBar;
-		SceneSettingsPannel m_ProjectSettingsPanel;
+		SceneSettingsPannel m_SceneSettingsPanel;
+		ProjectSettingsPanel m_ProjectSettingsPanel;
 		ConsolePanel m_ConsolePanel;
 
 		bool m_PrimaryCamera = true;

@@ -159,6 +159,7 @@ namespace Revoke
 		ImGuiID toolbarId = ImGui::DockBuilderSplitNode(centerId, ImGuiDir_Up, toolbarRatio, nullptr, &centerId);
 
 		ImGui::DockBuilderDockWindow("Scene Settings", settingsId);
+		ImGui::DockBuilderDockWindow("Project Settings", settingsId);
 		ImGui::DockBuilderDockWindow("Properties", propertiesId);
 		ImGui::DockBuilderDockWindow("Console", bottomId);
 		ImGui::DockBuilderDockWindow("Content Browser", bottomId);
@@ -284,6 +285,7 @@ namespace Revoke
 		//--------------------------------------------------------------------
 		m_ObjPannel.OnImGuiRender();
 		m_ContentBrowserPanel.OnImGuiRender();
+		m_SceneSettingsPanel.OnImGuiRender();
 		m_ProjectSettingsPanel.OnImGuiRender();
 		m_ConsolePanel.OnImGuiRender();
 		//-----------ViewPort-------------------------------------------------
@@ -523,6 +525,7 @@ namespace Revoke
 		m_Project = project;
 		m_ContentBrowserPanel.SetAssetsDirectory(project->GetAssetsDirectory());
 		m_ObjPannel.SetAssetsDirectory(project->GetAssetsDirectory());
+		m_ProjectSettingsPanel.SetProject(project);
 
 		NewScene();
 	}
@@ -552,7 +555,7 @@ namespace Revoke
 	void CraftLayer::SetPanelsScene(const Shared<Scene>& scene)
 	{
 		m_ObjPannel.SetScene(scene);
-		m_ProjectSettingsPanel.SetScene(scene);
+		m_SceneSettingsPanel.SetScene(scene);
 	}
 
 	void CraftLayer::NewScene()

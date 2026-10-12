@@ -24,6 +24,16 @@ namespace Revoke::UI
 		ImGui::PopFont();
 	}
 
+	void SectionHeader(const char* title)
+	{
+		ImGui::Spacing();
+		ImGui::PushFont(ImGuiLayer::GetFont(FontStyle::Bold));
+		ImGui::PushStyleColor(ImGuiCol_Text, Theme::TextMuted);
+		ImGui::SeparatorText(title);
+		ImGui::PopStyleColor();
+		ImGui::PopFont();
+	}
+
 	bool IconButton(const char* icon, const char* tooltip, ImVec2 size)
 	{
 		if (size.x <= 0.0f || size.y <= 0.0f)

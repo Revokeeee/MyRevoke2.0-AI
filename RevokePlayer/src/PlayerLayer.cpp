@@ -1,24 +1,9 @@
 #include "PlayerLayer.h"
 
-#include "MyRevoke/Utility/ExecutablePath.h"
-
 namespace Revoke
 {
-	// An exported game keeps its project file next to the exe. Running the player straight out of the
-	// repo has none there, so fall back to the example project the editor opens.
-	static std::filesystem::path FindProjectFile()
-	{
-		for (const auto& entry : std::filesystem::directory_iterator(GetExecutableDirectory()))
-		{
-			if (entry.path().extension() == ".mrproject")
-				return entry.path();
-		}
-
-		return GetExecutableDirectory() / "projects" / "Example" / "Example.mrproject";
-	}
-
-	PlayerLayer::PlayerLayer()
-		: Layer("PlayerLayer")
+	PlayerLayer::PlayerLayer(Shared<Project> project)
+		: Layer("PlayerLayer"), m_Project(std::move(project))
 	{
 	}
 
@@ -28,19 +13,18 @@ namespace Revoke
 		RendererAPI::SetClearColor({ 0.2f, 0.2f, 0.2f, 1.0f });
 		RendererAPI::EnableBlending();
 
-		Shared<Project> project = Project::Load(FindProjectFile());
-		if (!project)
+		if (!m_Project)
 			return;
 
-		std::filesystem::path startupScene = project->GetStartupScenePath();
+		std::filesystem::path startupScene = m_Project->GetStartupScenePath();
 		if (startupScene.empty())
 		{
-			RV_ENGINE_ERROR("Project {0} names no startup scene", project->GetName());
+			RV_ENGINE_ERROR("Project {0} names no startup scene", m_Project->GetName());
 			return;
 		}
 
 		Shared<Scene> scene = std::make_shared<Scene>();
-		Serializer serializer(scene, project->GetAssetsDirectory());
+		Serializer serializer(scene, m_Project->GetAssetsDirectory());
 		if (!serializer.DeSerealize(startupScene.string()))
 		{
 			RV_ENGINE_ERROR("Could not load the startup scene: {0}", startupScene.string());

@@ -56,3 +56,54 @@ TEST_CASE("A project file without a startup scene has no startup scene path")
 
 	CHECK(project->GetStartupScenePath().empty());
 }
+
+TEST_CASE("Game settings come back out of the project file")
+{
+	TestProjectFile file("Project: Game\nGameName: Space Crabs\nAssetsFolder: assets\nWindowWidth: 800\nWindowHeight: 600\nFullscreen: true\n");
+
+	Shared<Project> project = Project::Load(file.Path);
+	REQUIRE(project != nullptr);
+
+	CHECK(project->GetGameName() == "Space Crabs");
+	CHECK(project->GetWindowWidth() == 800);
+	CHECK(project->GetWindowHeight() == 600);
+	CHECK(project->IsFullscreen());
+}
+
+TEST_CASE("A project file written before the game settings existed still has usable ones")
+{
+	TestProjectFile file("Project: Game\nAssetsFolder: assets\n");
+
+	Shared<Project> project = Project::Load(file.Path);
+	REQUIRE(project != nullptr);
+
+	CHECK(project->GetGameName() == "Game");
+	CHECK(project->GetWindowWidth() == 1280);
+	CHECK(project->GetWindowHeight() == 720);
+	CHECK_FALSE(project->IsFullscreen());
+}
+
+// Project Settings edits only reach RevokePlayer through the project file, so what Save writes
+// has to load back unchanged.
+TEST_CASE("Saved game settings load back")
+{
+	TestProjectFile file("Project: Game\nAssetsFolder: assets\n");
+
+	Shared<Project> project = Project::Load(file.Path);
+	REQUIRE(project != nullptr);
+
+	project->SetGameName("Space Crabs");
+	project->SetStartupScene("Scenes/Level2.myrevoke");
+	project->SetWindowSize(1024, 768);
+	project->SetFullscreen(true);
+	project->Save();
+
+	Shared<Project> reloaded = Project::Load(file.Path);
+	REQUIRE(reloaded != nullptr);
+
+	CHECK(reloaded->GetGameName() == "Space Crabs");
+	CHECK(reloaded->GetStartupScenePath() == file.Directory / "assets" / "Scenes" / "Level2.myrevoke");
+	CHECK(reloaded->GetWindowWidth() == 1024);
+	CHECK(reloaded->GetWindowHeight() == 768);
+	CHECK(reloaded->IsFullscreen());
+}

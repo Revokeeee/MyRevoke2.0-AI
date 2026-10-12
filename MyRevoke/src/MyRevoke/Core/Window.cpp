@@ -57,7 +57,10 @@ namespace Revoke
 
 		glfwWindowHint(GLFW_MAXIMIZED, settings.Maximized ? GLFW_TRUE : GLFW_FALSE);
 
-		m_Window = glfwCreateWindow((int)settings.Width, (int)settings.Height, m_Data.Title.c_str(), nullptr, nullptr);
+		// Giving GLFW a monitor makes the window fullscreen on it, switching the video mode to the
+		// requested size. No monitor leaves it an ordinary desktop window.
+		GLFWmonitor* monitor = settings.Fullscreen ? glfwGetPrimaryMonitor() : nullptr;
+		m_Window = glfwCreateWindow((int)settings.Width, (int)settings.Height, m_Data.Title.c_str(), monitor, nullptr);
 
 		// A maximized (or otherwise OS-clamped) window's real size differs from the
 		// requested one, so read it back before anything uses m_Data.Width/Height.
