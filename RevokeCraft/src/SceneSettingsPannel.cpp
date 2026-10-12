@@ -12,19 +12,6 @@
 
 namespace Revoke
 {
-	namespace
-	{
-		void SectionHeader(const char* title)
-		{
-			ImGui::Spacing();
-			ImGui::PushFont(ImGuiLayer::GetFont(FontStyle::Bold));
-			ImGui::PushStyleColor(ImGuiCol_Text, Theme::TextMuted);
-			ImGui::SeparatorText(title);
-			ImGui::PopStyleColor();
-			ImGui::PopFont();
-		}
-	}
-
 	void SceneSettingsPannel::OnImGuiRender()
 	{
 		ImGui::Begin("Scene Settings");
@@ -36,7 +23,7 @@ namespace Revoke
 			return;
 		}
 
-		SectionHeader("Scene");
+		UI::SectionHeader("Scene");
 		if (UI::BeginProperties("##scene"))
 		{
 			std::string name = m_CurrentScene->GetName();
@@ -45,7 +32,7 @@ namespace Revoke
 			UI::EndProperties();
 		}
 
-		SectionHeader("Rendering");
+		UI::SectionHeader("Rendering");
 		if (UI::BeginProperties("##rendering"))
 		{
 			if (UI::PropertyColor("Background", m_ClearColor))
@@ -61,7 +48,7 @@ namespace Revoke
 			UI::EndProperties();
 		}
 
-		SectionHeader("Physics");
+		UI::SectionHeader("Physics");
 		if (UI::BeginProperties("##physics"))
 		{
 			// Read from and written to the scene, so the values follow it when another scene opens.
@@ -78,7 +65,7 @@ namespace Revoke
 		// Needs MSBuild and the repo checkout, neither of which a shipped
 		// editor has, so Dist builds don't offer it (#36, #78).
 #ifndef RV_DIST
-		SectionHeader("Scripting");
+		UI::SectionHeader("Scripting");
 		if (ImGui::Button(RV_ICON_BUILD "  Build Scripts", ImVec2(ImGui::GetContentRegionAvail().x, 0.0f)))
 		{
 #ifdef RV_DEBUG

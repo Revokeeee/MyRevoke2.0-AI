@@ -22,16 +22,37 @@ namespace Revoke
 		std::filesystem::path GetScenesDirectory() const { return GetAssetsDirectory() / "Scenes"; }
 		std::filesystem::path GetScriptsDirectory() const { return GetAssetsDirectory() / "Scripts"; }
 
+		// What the shipped game is called. It is the player's window title, and it can differ from
+		// the project's name, which is fixed by the .mrproject file's name.
+		const std::string& GetGameName() const { return m_GameName; }
+		void SetGameName(const std::string& gameName) { m_GameName = gameName; }
+
+		// Relative to the assets folder, so the project stays valid when it is moved.
+		const std::string& GetStartupScene() const { return m_StartupScene; }
+		void SetStartupScene(const std::string& sceneRelativeToAssets) { m_StartupScene = sceneRelativeToAssets; }
+
 		// The scene a game built from this project starts in. Empty when the project file names none.
 		std::filesystem::path GetStartupScenePath() const;
 
-	private:
+		// The window the shipped game opens.
+		unsigned int GetWindowWidth() const { return m_WindowWidth; }
+		unsigned int GetWindowHeight() const { return m_WindowHeight; }
+		bool IsFullscreen() const { return m_Fullscreen; }
+		void SetWindowSize(unsigned int width, unsigned int height) { m_WindowWidth = width; m_WindowHeight = height; }
+		void SetFullscreen(bool fullscreen) { m_Fullscreen = fullscreen; }
+
+		// Writes the project file back. The editor calls this after every settings change.
 		void Save() const;
 
+	private:
 		std::string m_Name;
+		std::string m_GameName;
 		std::string m_AssetsFolder = "assets";
-		// Relative to the assets folder, so the project stays valid when it is moved.
 		std::string m_StartupScene;
 		std::filesystem::path m_Directory;
+
+		unsigned int m_WindowWidth = 1280;
+		unsigned int m_WindowHeight = 720;
+		bool m_Fullscreen = false;
 	};
 }

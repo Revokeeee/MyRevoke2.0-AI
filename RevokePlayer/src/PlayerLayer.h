@@ -10,7 +10,8 @@ namespace Revoke
 	class PlayerLayer : public Layer
 	{
 	public:
-		PlayerLayer();
+		// project is null when none could be loaded; the layer then runs nothing.
+		explicit PlayerLayer(Shared<Project> project);
 
 		void OnAttach() override;
 		void OnDetach() override;
@@ -21,6 +22,7 @@ namespace Revoke
 	private:
 		void StopRuntime();
 
+		Shared<Project> m_Project;
 		// Null when the project or its startup scene could not be loaded.
 		Shared<Scene> m_Scene;
 		uint32_t m_ViewportWidth = 0, m_ViewportHeight = 0;

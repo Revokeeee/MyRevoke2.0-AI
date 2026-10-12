@@ -19,6 +19,9 @@ namespace Revoke::UI
 	// Centered, muted text for a panel with nothing to show.
 	void EmptyState(const char* icon, const char* text);
 
+	// A bold, muted separator splitting a settings panel into named groups.
+	void SectionHeader(const char* title);
+
 	// Text box with a search icon and a clear button. Returns true when the text changed.
 	// width 0 fills the rest of the line.
 	bool SearchBox(const char* id, std::string& text, const char* hint = "Search", float width = 0.0f);
