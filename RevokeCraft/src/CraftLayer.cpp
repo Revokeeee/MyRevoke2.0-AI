@@ -81,13 +81,16 @@ namespace Revoke
 
 		m_FrameBuffer->ClearColorTextureAttachment(1, -1);
 
-		ScriptEngine::OnUpdate();
-
 		//TODO: Fix the picking in a play mode!!!
 		switch (m_ToolBar.GetSceneState())
 		{
 		case SceneState::Editor:
 		{
+			// Reloading the script DLL frees the module the live script instances were
+			// created from, so only do it in Editor state, where no instance exists.
+			// A rebuild done during Play is picked up here, before the next Play.
+			ScriptEngine::OnUpdate();
+
 			if (m_ViewportFocused)
 			{
 				m_EditorCamera.OnUpdate(deltaTime);
